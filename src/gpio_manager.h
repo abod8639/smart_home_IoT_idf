@@ -3,26 +3,7 @@
 
 #include <stdint.h>
 #include "esp_err.h"
-
-// ---------------------------------------------------------------------------
-// Pin definitions
-// ---------------------------------------------------------------------------
-#define RELAY_1_PIN  2
-#define RELAY_2_PIN  18
-#define RELAY_3_PIN  19
-#define RELAY_4_PIN  21
-
-// ---------------------------------------------------------------------------
-// Shared helper: map a relay GPIO pin to its Flutter/Matter endpoint ID.
-// Centralised here to avoid duplicating the mapping in ws_server.c and
-// firebase_manager.c.
-// ---------------------------------------------------------------------------
-static inline int gpio_pin_to_endpoint(int pin) {
-    if (pin == RELAY_2_PIN) return 2;
-    if (pin == RELAY_3_PIN) return 3;
-    if (pin == RELAY_4_PIN) return 4;
-    return 1; // RELAY_1_PIN or unknown → endpoint 1
-}
+#include "device_config.h"   // Pin definitions and gpio_pin_to_endpoint()
 
 // ---------------------------------------------------------------------------
 // API
