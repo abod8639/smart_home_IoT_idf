@@ -1,18 +1,25 @@
 #include "dht_sensor.h"
+#include "device_config.h"
 #include "driver/gpio.h"
 #include "rom/ets_sys.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 
 static const char *TAG = "DHT_SENSOR";
 
 static float s_last_temp = 0.0f;
 static float s_last_hum  = 0.0f;
 
+// Mutex protecting s_last_temp and s_last_hum against concurrent
+// read/write from dht_monitor_task and state_builder / MQTT tasks.
+static SemaphoreHandle_t s_dht_mutex = NULL;
+
 void dht_sensor_init(void) {
     ESP_LOGI(TAG, "Initializing DHT22 sensor on GPIO %d", DHT_PIN);
     gpio_set_pull_mode((gpio_num_t)DHT_PIN, GPIO_PULLUP_ONLY);
+    s_dht_mutex = xSemaphoreCreateMutex();
 }
 
 // ---------------------------------------------------------------------------
@@ -107,16 +114,30 @@ esp_err_t dht_sensor_read(float *temperature, float *humidity) {
     int16_t raw  = (int16_t)(((data[2] & 0x7F) << 8) | data[3]);
     *temperature = raw * 0.1f * ((data[2] & 0x80) ? -1.0f : 1.0f);
 
-    s_last_temp = *temperature;
-    s_last_hum  = *humidity;
+    // Thread-safe update of cached values
+    if (s_dht_mutex && xSemaphoreTake(s_dht_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        s_last_temp = *temperature;
+        s_last_hum  = *humidity;
+        xSemaphoreGive(s_dht_mutex);
+    }
 
     return ESP_OK;
 }
 
 float dht_sensor_get_temperature(void) {
-    return s_last_temp;
+    float val = 0.0f;
+    if (s_dht_mutex && xSemaphoreTake(s_dht_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        val = s_last_temp;
+        xSemaphoreGive(s_dht_mutex);
+    }
+    return val;
 }
 
 float dht_sensor_get_humidity(void) {
-    return s_last_hum;
+    float val = 0.0f;
+    if (s_dht_mutex && xSemaphoreTake(s_dht_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        val = s_last_hum;
+        xSemaphoreGive(s_dht_mutex);
+    }
+    return val;
 }
