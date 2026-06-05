@@ -1,5 +1,6 @@
 #include "ota_manager.h"
 #include "esp_https_ota.h"
+#include "esp_crt_bundle.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -13,8 +14,7 @@ static void ota_task(void *pvParameter) {
 
     esp_http_client_config_t config = {
         .url = url,
-        // In a real application, you should provide .cert_pem here
-        .skip_cert_common_name_check = true, 
+        .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
     esp_https_ota_config_t ota_config = {
