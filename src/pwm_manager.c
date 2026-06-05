@@ -42,3 +42,14 @@ void pwm_set_duty(uint8_t pin, uint32_t duty) {
     ledc_update_duty(LEDC_LOW_SPEED_MODE, channel);
     ESP_LOGD(TAG, "Set PWM pin %d to duty %d", pin, duty);
 }
+
+uint32_t pwm_get_duty(uint8_t pin) {
+    ledc_channel_t channel = LEDC_CHANNEL_0;
+    if (pin == PWM_LAMP_PIN) channel = LEDC_CHANNEL_0;
+    else if (pin == PWM_RGB_R_PIN) channel = LEDC_CHANNEL_1;
+    else if (pin == PWM_RGB_G_PIN) channel = LEDC_CHANNEL_2;
+    else if (pin == PWM_RGB_B_PIN) channel = LEDC_CHANNEL_3;
+
+    return ledc_get_duty(LEDC_LOW_SPEED_MODE, channel);
+}
+
