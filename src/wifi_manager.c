@@ -6,28 +6,38 @@
 #include <string.h>
 
 static const char *TAG = "WIFI_MANAGER";
+
+// Global event group — set WIFI_CONNECTED_BIT when an IP is obtained.
+EventGroupHandle_t g_wifi_event_group = NULL;
+
 static int s_retry_num = 0;
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                int32_t event_id, void* event_data) {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
+
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < 10) {
-            esp_wifi_connect();
-            s_retry_num++;
-            ESP_LOGI(TAG, "Retrying connection to AP...");
-        } else {
-            ESP_LOGE(TAG, "Failed to connect to AP");
-        }
+        // Clear the connected bit immediately so waiters stop.
+        xEventGroupClearBits(g_wifi_event_group, WIFI_CONNECTED_BIT);
+        s_retry_num++;
+        ESP_LOGW(TAG, "\033[1;33m[WIFI]\033[0m Disconnected — retry #%d (auto-reconnect)...", s_retry_num);
+        // Always retry — an IoT device should never give up reconnecting.
+        esp_wifi_connect();
+
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(TAG, "\033[1;32m[WIFI]\033[0m Connected ✓ — IP: " IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
+        // Signal all waiters (WebSocket server, Firebase, etc.)
+        xEventGroupSetBits(g_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
 
 void wifi_manager_init(void) {
+    // Create the event group before starting WiFi so handlers can set bits.
+    g_wifi_event_group = xEventGroupCreate();
+
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_create_default_wifi_sta();
@@ -48,9 +58,15 @@ void wifi_manager_init(void) {
                                                         NULL,
                                                         &instance_got_ip));
 
+    // Credentials are managed via menuconfig (pio run -t menuconfig)
+    // and stored securely in sdkconfig — never hardcoded in source.
     wifi_config_t wifi_config = {
-        .sta = {.ssid = ">_", .password = "Qwertyuio0qwertyuio0"},
+        .sta = {
+            .ssid     = CONFIG_WIFI_SSID,
+            .password = CONFIG_WIFI_PASSWORD,
+        },
     };
+
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -63,4 +79,3 @@ int wifi_manager_get_rssi(void) {
     }
     return -100;
 }
-
