@@ -9,7 +9,7 @@
 #include "esp_timer.h"
 #include "rom/ets_sys.h"
 #include "cJSON.h"
-#include "ws_server.h"
+#include "mqtt_manager.h"
 #include "firebase_manager.h"
 
 static const char *TAG = "IR_MANAGER";
@@ -119,7 +119,7 @@ static void ir_rx_task(void *pvParameters) {
 
     if (elapsed_ms >= timeout_ms) {
         ESP_LOGW(TAG, "IR learning timeout — no signal detected");
-        ws_server_broadcast("{\"event\":\"ir_learn_status\",\"status\":\"timeout\"}");
+        mqtt_manager_publish_event("{\"event\":\"ir_learn_status\",\"status\":\"timeout\"}");
         s_ir_rx_task_handle = NULL;
         vTaskDelete(NULL);
         return;
@@ -175,14 +175,14 @@ static void ir_rx_task(void *pvParameters) {
         cJSON_AddNumberToObject(root, "frequency", 38);
 
         char *json_str = cJSON_PrintUnformatted(root);
-        ws_server_broadcast(json_str);
+        mqtt_manager_publish_event(json_str);
         firebase_update_ir_signal("RAW", val_str);
 
         free(json_str);
         cJSON_Delete(root);
         free(val_str);
     } else {
-        ws_server_broadcast("{\"event\":\"ir_learn_status\",\"status\":\"error\","
+        mqtt_manager_publish_event("{\"event\":\"ir_learn_status\",\"status\":\"error\","
                             "\"message\":\"Signal too short\"}");
     }
 
