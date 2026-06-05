@@ -89,7 +89,7 @@ static esp_err_t firebase_http_request(const char* path, const char* method, con
             }
         }
     } else {
-        ESP_LOGE(TAG, "HTTP %s request failed: %s", method, esp_err_to_name(err));
+        ESP_LOGE(TAG, "\033[1;31m[HTTP Failed]\033[0m %s request failed: %s", method, esp_err_to_name(err));
     }
 
     esp_http_client_cleanup(client);
@@ -162,7 +162,7 @@ static void firebase_poll_task(void *pvParameters) {
                         if (strcmp(action->valuestring, "send_ir") == 0) {
                             cJSON *value = cJSON_GetObjectItem(json, "value");
                             if (value && cJSON_IsString(value)) {
-                                ESP_LOGI(TAG, "Executing IR Command from Firebase");
+                                ESP_LOGI(TAG, "\033[1;33m[Firebase Command]\033[0m Action: \033[1;35mSend IR\033[0m");
                                 char *val_copy = strdup(value->valuestring);
                                 if (val_copy) {
                                     uint16_t *durations = malloc(sizeof(uint16_t) * 256);
@@ -184,7 +184,8 @@ static void firebase_poll_task(void *pvParameters) {
                             cJSON *pin = cJSON_GetObjectItem(json, "pin");
                             cJSON *val = cJSON_GetObjectItem(json, "value");
                             if (pin && val) {
-                                ESP_LOGI(TAG, "Executing Set Relay Command from Firebase: pin %d = %d", pin->valueint, val->valueint);
+                                ESP_LOGI(TAG, "\033[1;33m[Firebase Command]\033[0m Action: \033[1;36mSet Relay\033[0m ➔ Pin %d = %s", 
+                                         pin->valueint, val->valueint ? "\033[1;32m[ ON ]\033[0m" : "\033[1;31m[ OFF ]\033[0m");
                                 gpio_set_relay_state(pin->valueint, val->valueint);
                                 
                                 int endpoint = 1;
@@ -203,7 +204,8 @@ static void firebase_poll_task(void *pvParameters) {
                             cJSON *pin = cJSON_GetObjectItem(json, "pin");
                             cJSON *val = cJSON_GetObjectItem(json, "value");
                             if (pin && val) {
-                                ESP_LOGI(TAG, "Executing Set PWM Command from Firebase: pin %d = %d", pin->valueint, val->valueint);
+                                ESP_LOGI(TAG, "\033[1;33m[Firebase Command]\033[0m Action: \033[1;36mSet PWM\033[0m ➔ Pin %d = \033[1;35m%d\033[0m (%d%%)", 
+                                         pin->valueint, val->valueint, (val->valueint * 100) / 255);
                                 pwm_set_duty(pin->valueint, val->valueint);
                                 
                                 int endpoint = 5;
@@ -222,7 +224,9 @@ static void firebase_poll_task(void *pvParameters) {
                             cJSON *is_on = cJSON_GetObjectItem(json, "isOn");
                             cJSON *target_temp = cJSON_GetObjectItem(json, "target_temp");
                             
-                            ESP_LOGI(TAG, "Executing Control AC Command from Firebase");
+                            ESP_LOGI(TAG, "\033[1;33m[Firebase Command]\033[0m Action: \033[1;36mControl AC\033[0m ➔ Power: %s, Temp: \033[1;36m%d°C\033[0m", 
+                                     (is_on && is_on->valueint) ? "\033[1;32m[ ON ]\033[0m" : "\033[1;31m[ OFF ]\033[0m", 
+                                     target_temp ? target_temp->valueint : nvs_get_target_temp(24));
                             if (target_temp) {
                                 nvs_save_target_temp(target_temp->valueint);
                             }
@@ -238,7 +242,7 @@ static void firebase_poll_task(void *pvParameters) {
                             ws_server_broadcast(update_buf);
                             executed = true;
                         } else if (strcmp(action->valuestring, "ir_learn") == 0) {
-                            ESP_LOGI(TAG, "Executing IR Learn Command from Firebase");
+                            ESP_LOGI(TAG, "\033[1;33m[Firebase Command]\033[0m Action: \033[1;35mIR Learn\033[0m");
                             ir_manager_start_learning();
                             executed = true;
                         }
