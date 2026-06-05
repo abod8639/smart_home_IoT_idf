@@ -49,10 +49,7 @@ void wifi_manager_init(void) {
                                                         &instance_got_ip));
 
     wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = "MyWiFiNetwork",
-            .password = "MyPassword123",
-        },
+        .sta = {.ssid = ">_", .password = "Qwertyuio0qwertyuio0"},
     };
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
