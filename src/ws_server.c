@@ -110,8 +110,23 @@ static esp_err_t handle_ws_req(httpd_req_t *req) {
         if (ret != ESP_OK) { free(buf); return ret; }
 
         if (ws_pkt.type == HTTPD_WS_TYPE_TEXT) {
-            ESP_LOGI(TAG, "Got packet: %s", ws_pkt.payload);
             cJSON *json = cJSON_Parse((char*)ws_pkt.payload);
+            bool logged = false;
+            if (json) {
+                cJSON *action = cJSON_GetObjectItem(json, "action");
+                if (action && action->valuestring) {
+                    logged = true;
+                    if (strcmp(action->valuestring, "get_state") == 0) {
+                        ESP_LOGD(TAG, "Got poll packet: %s", ws_pkt.payload);
+                    } else {
+                        ESP_LOGI(TAG, "\033[1;32m[WS Packet]\033[0m Action: \033[1;36m%s\033[0m ➔ %s", 
+                                 action->valuestring, (char*)ws_pkt.payload);
+                    }
+                }
+            }
+            if (!logged) {
+                ESP_LOGI(TAG, "Got packet: %s", ws_pkt.payload);
+            }
             if (json) {
                 cJSON *action = cJSON_GetObjectItem(json, "action");
                 if (action && action->valuestring) {
