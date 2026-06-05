@@ -32,9 +32,34 @@ static EventGroupHandle_t s_firebase_event_group = NULL;
  */
 static SemaphoreHandle_t s_http_mutex = NULL;
 
-// ---------------------------------------------------------------------------
-// Internal HTTP helper
-// ---------------------------------------------------------------------------
+struct http_response_buffer {
+    char *data;
+    int len;
+    int capacity;
+};
+
+static esp_err_t http_event_handler(esp_http_client_event_t *evt) {
+    if (evt->event_id == HTTP_EVENT_ON_DATA) {
+        struct http_response_buffer *res = (struct http_response_buffer *)evt->user_data;
+        if (res && res->data) {
+            int needed = res->len + evt->data_len + 1;
+            if (needed > res->capacity) {
+                int new_cap = needed * 2;
+                char *new_data = realloc(res->data, new_cap);
+                if (new_data) {
+                    res->data = new_data;
+                    res->capacity = new_cap;
+                } else {
+                    return ESP_ERR_NO_MEM;
+                }
+            }
+            memcpy(res->data + res->len, evt->data, evt->data_len);
+            res->len += evt->data_len;
+            res->data[res->len] = '\0';
+        }
+    }
+    return ESP_OK;
+}
 
 static esp_err_t firebase_http_request(const char *path, const char *method,
                                        const char *post_data, char **response_data) {
@@ -53,11 +78,23 @@ static esp_err_t firebase_http_request(const char *path, const char *method,
                  FIREBASE_BASE_URL, DEVICE_ID, path);
     }
 
+    // Allocate response buffer if caller expects response data
+    struct http_response_buffer res_buf = {0};
+    if (response_data) {
+        res_buf.capacity = 256;
+        res_buf.data = malloc(res_buf.capacity);
+        if (res_buf.data) {
+            res_buf.data[0] = '\0';
+        }
+    }
+
     esp_http_client_config_t config = {
         .url               = url,
         .method            = HTTP_METHOD_GET,
         .timeout_ms        = 8000,
         .crt_bundle_attach = esp_crt_bundle_attach,
+        .event_handler     = http_event_handler,
+        .user_data         = response_data ? &res_buf : NULL,
     };
 
     if      (strcmp(method, "PATCH")  == 0) config.method = HTTP_METHOD_PATCH;
@@ -68,6 +105,7 @@ static esp_err_t firebase_http_request(const char *path, const char *method,
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (!client) {
         ESP_LOGE(TAG, "Failed to initialize HTTP client");
+        if (res_buf.data) free(res_buf.data);
         xSemaphoreGive(s_http_mutex);
         return ESP_FAIL;
     }
@@ -80,52 +118,20 @@ static esp_err_t firebase_http_request(const char *path, const char *method,
     esp_err_t err = esp_http_client_perform(client);
     if (err == ESP_OK) {
         int status_code    = esp_http_client_get_status_code(client);
-        int content_length = esp_http_client_get_content_length(client);
-
         if (status_code != 200 && status_code != 204) {
             ESP_LOGW(TAG, "\033[1;33m[HTTP Warning]\033[0m %s response status code: %d", method, status_code);
         }
 
         if (response_data && status_code == 200) {
-            if (content_length > 0) {
-                *response_data = (char *)malloc(content_length + 1);
-                if (*response_data) {
-                    int read_len = esp_http_client_read_response(client, *response_data, content_length);
-                    (*response_data)[read_len] = '\0';
-                }
-            } else {
-                // Chunked transfer encoding — pre-allocate a reasonable buffer
-                // to avoid excessive realloc calls.
-                int   capacity   = 512;
-                int   total_read = 0;
-                char  buf[256];
-                *response_data = (char *)malloc(capacity);
-                if (!*response_data) goto cleanup;
-                (*response_data)[0] = '\0';
-
-                while (1) {
-                    int read_len = esp_http_client_read(client, buf, sizeof(buf) - 1);
-                    if (read_len <= 0) break;
-                    buf[read_len] = '\0';
-
-                    // Grow buffer if needed (double strategy)
-                    if (total_read + read_len + 1 > capacity) {
-                        capacity = (total_read + read_len + 1) * 2;
-                        char *new_str = (char *)realloc(*response_data, capacity);
-                        if (!new_str) break;
-                        *response_data = new_str;
-                    }
-                    memcpy(*response_data + total_read, buf, read_len);
-                    total_read += read_len;
-                    (*response_data)[total_read] = '\0';
-                }
-            }
+            *response_data = res_buf.data;
+        } else {
+            if (res_buf.data) free(res_buf.data);
         }
     } else {
         ESP_LOGE(TAG, "\033[1;31m[HTTP Failed]\033[0m %s request failed: %s", method, esp_err_to_name(err));
+        if (res_buf.data) free(res_buf.data);
     }
 
-cleanup:
     esp_http_client_cleanup(client);
     xSemaphoreGive(s_http_mutex);
     return err;
