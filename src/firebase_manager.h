@@ -26,9 +26,9 @@ esp_err_t firebase_manager_init(void);
 /**
  * @brief Update the last received IR signal to Firebase
  * @param protocol The protocol name (e.g., "NEC")
- * @param ir_value The IR hex value (e.g., 0xFFE01F)
+ * @param ir_value_str The IR value as string (e.g., "0xFFE01F" or raw timings)
  */
-esp_err_t firebase_update_ir_signal(const char* protocol, uint32_t ir_value);
+esp_err_t firebase_update_ir_signal(const char* protocol, const char* ir_value_str);
 
 /**
  * @brief Update the device status on Firebase
