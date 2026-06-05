@@ -1,6 +1,7 @@
 #include "ir_manager.h"
 #include "driver/rmt_tx.h"
 #include "driver/rmt_rx.h"
+#include "driver/rmt_encoder.h"
 #include "esp_log.h"
 
 static const char *TAG = "IR_MANAGER";
@@ -29,7 +30,7 @@ void ir_send_raw(uint16_t* durations, size_t length, uint32_t freq_hz) {
     ESP_ERROR_CHECK(rmt_apply_carrier(tx_chan, &carrier_config));
     ESP_ERROR_CHECK(rmt_enable(tx_chan));
 
-    rmt_symbol_type_t* rmt_data = malloc(sizeof(rmt_symbol_type_t) * length);
+    rmt_symbol_word_t* rmt_data = malloc(sizeof(rmt_symbol_word_t) * length);
     if (!rmt_data) {
         ESP_LOGE(TAG, "Failed to allocate memory for RMT data");
         rmt_disable(tx_chan);
@@ -38,22 +39,27 @@ void ir_send_raw(uint16_t* durations, size_t length, uint32_t freq_hz) {
     }
 
     for (size_t i = 0; i < length; i++) {
-        rmt_data[i] = (rmt_symbol_type_t) {
-            .level0 = (i % 2 == 0) ? 1 : 0,
+        rmt_data[i] = (rmt_symbol_word_t) {
             .duration0 = durations[i],
-            .level1 = 0,
-            .duration1 = 0
+            .level0 = (i % 2 == 0) ? 1 : 0,
+            .duration1 = 0,
+            .level1 = 0
         };
     }
+
+    rmt_encoder_handle_t copy_encoder = NULL;
+    rmt_copy_encoder_config_t copy_encoder_config = {};
+    ESP_ERROR_CHECK(rmt_new_copy_encoder(&copy_encoder_config, &copy_encoder));
 
     rmt_transmit_config_t tx_config = {
         .loop_count = 0,
     };
-    rmt_transmit(tx_chan, rmt_data, length, &tx_config);
+    rmt_transmit(tx_chan, copy_encoder, rmt_data, sizeof(rmt_symbol_word_t) * length, &tx_config);
     // Wait for transmission to complete
     rmt_tx_wait_all_done(tx_chan, -1);
 
     free(rmt_data);
+    rmt_del_encoder(copy_encoder);
     rmt_disable(tx_chan);
     rmt_del_channel(tx_chan);
 }
