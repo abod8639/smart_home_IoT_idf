@@ -2,9 +2,11 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 #include <stdio.h>
 
 extern "C" {
+#include "device_config.h"
 #include "nvs_manager.h"
 #include "gpio_manager.h"
 #include "pwm_manager.h"
@@ -13,6 +15,8 @@ extern "C" {
 #include "wifi_manager.h"
 #include "mqtt_manager.h"
 #include "firebase_manager.h"
+#include "sntp_manager.h"
+#include "mdns_manager.h"
 }
 #include "matter_manager.h"
 
@@ -28,7 +32,13 @@ static void dht_monitor_task(void *pvParameters) {
     xEventGroupWaitBits(g_wifi_event_group, WIFI_CONNECTED_BIT,
                         pdFALSE, pdTRUE, portMAX_DELAY);
 
+    // Subscribe to task watchdog
+    esp_task_wdt_add(NULL);
+
     while (true) {
+        // Feed the watchdog
+        esp_task_wdt_reset();
+
         float temp = 0.0f, hum = 0.0f;
         esp_err_t err = dht_sensor_read(&temp, &hum);
 
@@ -37,7 +47,7 @@ static void dht_monitor_task(void *pvParameters) {
                           "Temp: \033[1;36m%.1f°C\033[0m | Hum: \033[1;35m%.1f%%\033[0m",
                      temp, hum);
 
-            // Broadcast sensor data via WebSocket
+            // Broadcast sensor data via MQTT
             char buf[96];
             snprintf(buf, sizeof(buf),
                      "{\"event\":\"sensor_data\",\"temperature\":%.1f,\"humidity\":%.1f}",
@@ -69,9 +79,19 @@ extern "C" void app_main() {
            " \\___ \\| '_ ` _ \\ / _` | '__| __| |  __  |/ _ \\| '_ ` _ \\ / _ \\\n"
            " ____) | | | | | | (_| | |  | |_  | |  | | (_) | | | | | |  __/\n"
            "|_____/|_| |_| |_|\\__,_|_|   \\__| |_|  |_|\\___/|_| |_| |_|\\___|\n"
-           "\033[0;33m ============================================================= \033[0m\n\n");
+           "\033[0;33m ============================================================= \033[0m\n"
+           "\033[0;36m  Firmware: %s\033[0m\n\n", FIRMWARE_VERSION);
 
     ESP_LOGI(TAG, "\033[1;32m[SYSTEM]\033[0m Starting Smart Home IoT Application...");
+
+    // 0. Task Watchdog — monitor critical tasks (30s timeout)
+    ESP_LOGI(TAG, "\033[1;31m[WATCHDOG]\033[0m Initializing Task Watchdog (30s timeout)...");
+    esp_task_wdt_config_t wdt_config = {
+        .timeout_ms = 30000,
+        .idle_core_mask = 0,       // Don't watch idle tasks
+        .trigger_panic = true,     // Reboot on watchdog timeout
+    };
+    esp_task_wdt_reconfigure(&wdt_config);
 
     // 1. Storage (must be first — NVS is used by all other managers)
     ESP_LOGI(TAG, "\033[1;35m[STORAGE]\033[0m Initializing NVS Storage...");
@@ -102,7 +122,14 @@ extern "C" void app_main() {
     ESP_LOGI(TAG, "\033[1;32m[SERVICES]\033[0m Initializing Firebase Integration...");
     firebase_manager_init();
 
-    // 5. Sensor monitoring task — waits for WiFi, then runs independently
+    // 5. LAN discovery and time sync
+    ESP_LOGI(TAG, "\033[1;34m[NETWORK]\033[0m Initializing mDNS (smarthome.local)...");
+    mdns_manager_init();
+
+    ESP_LOGI(TAG, "\033[1;34m[NETWORK]\033[0m Initializing SNTP Time Sync...");
+    sntp_manager_init();
+
+    // 6. Sensor monitoring task — waits for WiFi, then runs independently
     ESP_LOGI(TAG, "\033[1;32m[SERVICES]\033[0m Starting DHT22 monitor task...");
     xTaskCreate(dht_monitor_task, "dht_monitor", 4096, NULL, 3, NULL);
 
