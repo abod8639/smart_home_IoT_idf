@@ -3,15 +3,15 @@
 
 #include <stdint.h>
 #include "esp_err.h"
+#include "device_config.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// The device ID used in the topic paths. Must match the one in firebase_manager.h
-// Note: It's better to get this dynamically, but we'll keep it static for now as per original code.
-#define DEVICE_ID "esp32_smart_home_1"
-
+// ---------------------------------------------------------------------------
+// MQTT Topic Definitions (derived from the centralised DEVICE_ID)
+// ---------------------------------------------------------------------------
 #define MQTT_TOPIC_CMD    "smarthome/" DEVICE_ID "/cmd"
 #define MQTT_TOPIC_STATE  "smarthome/" DEVICE_ID "/state"
 #define MQTT_TOPIC_SENSOR "smarthome/" DEVICE_ID "/sensor"
@@ -39,7 +39,6 @@ void mqtt_manager_publish_sensor(const char *json_str);
  * @brief Publish the full state of the device.
  */
 void mqtt_manager_publish_state(void);
-
 
 #ifdef __cplusplus
 }
