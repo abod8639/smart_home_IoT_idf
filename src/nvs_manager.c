@@ -43,3 +43,27 @@ int nvs_get_pin_state(uint8_t pin, int default_val) {
     }
     return value;
 }
+
+void nvs_save_target_temp(int temp) {
+    nvs_handle_t my_handle;
+    esp_err_t err = nvs_open("pins_state", NVS_READWRITE, &my_handle);
+    if (err == ESP_OK) {
+        nvs_set_i32(my_handle, "target_temp", temp);
+        nvs_commit(my_handle);
+        nvs_close(my_handle);
+    } else {
+        ESP_LOGE(TAG, "Error (%s) opening NVS handle!", esp_err_to_name(err));
+    }
+}
+
+int nvs_get_target_temp(int default_val) {
+    nvs_handle_t my_handle;
+    int32_t value = default_val;
+    esp_err_t err = nvs_open("pins_state", NVS_READONLY, &my_handle);
+    if (err == ESP_OK) {
+        nvs_get_i32(my_handle, "target_temp", &value);
+        nvs_close(my_handle);
+    }
+    return value;
+}
+
