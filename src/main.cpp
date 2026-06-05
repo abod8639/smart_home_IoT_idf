@@ -16,7 +16,7 @@ extern "C" {
 #include "mqtt_manager.h"
 #include "firebase_manager.h"
 #include "sntp_manager.h"
-#include "mdns_manager.h"
+// #include "mdns_manager.h"  // TODO: Enable after installing mdns component
 }
 #include "matter_manager.h"
 
@@ -123,8 +123,9 @@ extern "C" void app_main() {
     firebase_manager_init();
 
     // 5. LAN discovery and time sync
-    ESP_LOGI(TAG, "\033[1;34m[NETWORK]\033[0m Initializing mDNS (smarthome.local)...");
-    mdns_manager_init();
+    // TODO: mDNS requires installing the mdns component via idf_component_manager
+    // ESP_LOGI(TAG, "\033[1;34m[NETWORK]\033[0m Initializing mDNS (smarthome.local)...");
+    // mdns_manager_init();
 
     ESP_LOGI(TAG, "\033[1;34m[NETWORK]\033[0m Initializing SNTP Time Sync...");
     sntp_manager_init();
