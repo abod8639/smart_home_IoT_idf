@@ -1,10 +1,18 @@
 #include "firebase_manager.h"
 #include "esp_log.h"
 #include "esp_http_client.h"
+#include "esp_crt_bundle.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "cJSON.h"
 #include "ir_manager.h"
+#include "gpio_manager.h"
+#include "pwm_manager.h"
+#include "dht_sensor.h"
+#include "wifi_manager.h"
+#include "nvs_manager.h"
+#include "ws_server.h"
+#include "esp_system.h"
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
@@ -26,7 +34,7 @@ static esp_err_t firebase_http_request(const char* path, const char* method, con
         .url = url,
         .method = HTTP_METHOD_GET,
         .timeout_ms = 5000,
-        // .cert_pem = (const char *)firebase_cert_pem_start, // Add SSL cert here for production
+        .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
     if (strcmp(method, "PATCH") == 0) config.method = HTTP_METHOD_PATCH;
@@ -94,6 +102,37 @@ esp_err_t firebase_update_status(const char* status) {
     return firebase_http_request("", "PATCH", payload, NULL);
 }
 
+esp_err_t firebase_update_full_state(void) {
+    cJSON *root = cJSON_CreateObject();
+    if (!root) return ESP_ERR_NO_MEM;
+    
+    cJSON_AddNumberToObject(root, "temperature", dht_sensor_get_temperature());
+    cJSON_AddNumberToObject(root, "humidity", dht_sensor_get_humidity());
+    cJSON_AddNumberToObject(root, "target_temperature", nvs_get_target_temp(24));
+    cJSON_AddNumberToObject(root, "wifi_rssi", wifi_manager_get_rssi());
+    cJSON_AddNumberToObject(root, "heap_free", esp_get_free_heap_size());
+
+    cJSON *pins = cJSON_CreateObject();
+    if (pins) {
+        cJSON_AddNumberToObject(pins, "relay_1", gpio_get_relay_state(RELAY_1_PIN));
+        cJSON_AddNumberToObject(pins, "relay_2", gpio_get_relay_state(RELAY_2_PIN));
+        cJSON_AddNumberToObject(pins, "relay_3", gpio_get_relay_state(RELAY_3_PIN));
+        cJSON_AddNumberToObject(pins, "relay_4", gpio_get_relay_state(RELAY_4_PIN));
+        cJSON_AddNumberToObject(pins, "pwm_lamp", pwm_get_duty(PWM_LAMP_PIN));
+        cJSON_AddNumberToObject(pins, "pwm_rgb_r", pwm_get_duty(PWM_RGB_R_PIN));
+        cJSON_AddNumberToObject(pins, "pwm_rgb_g", pwm_get_duty(PWM_RGB_G_PIN));
+        cJSON_AddNumberToObject(pins, "pwm_rgb_b", pwm_get_duty(PWM_RGB_B_PIN));
+        cJSON_AddItemToObject(root, "pins", pins);
+    }
+
+    char *json_str = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+
+    esp_err_t err = firebase_http_request("", "PATCH", json_str, NULL);
+    free(json_str);
+    return err;
+}
+
 esp_err_t firebase_update_ir_signal(const char* protocol, const char* ir_value_str) {
     char payload[1024]; // Increase size in case of long raw string
     struct timeval tv;
@@ -118,30 +157,97 @@ static void firebase_poll_task(void *pvParameters) {
                 cJSON *json = cJSON_Parse(response);
                 if (json != NULL) {
                     cJSON *action = cJSON_GetObjectItem(json, "action");
-                    cJSON *value = cJSON_GetObjectItem(json, "value");
-                    
-                    if (action && cJSON_IsString(action) && strcmp(action->valuestring, "send_ir") == 0) {
-                        if (value && cJSON_IsString(value)) {
-                            ESP_LOGI(TAG, "Executing IR Command from Firebase");
-                            // Value is expected to be comma-separated integers, e.g. "9000,4500,560..."
-                            char *val_copy = strdup(value->valuestring);
-                            if (val_copy) {
-                                uint16_t *durations = malloc(sizeof(uint16_t) * 256); // max 256 transitions
-                                size_t count = 0;
-                                char *token = strtok(val_copy, ",");
-                                while (token != NULL && count < 256) {
-                                    durations[count++] = (uint16_t)atoi(token);
-                                    token = strtok(NULL, ",");
+                    if (action && cJSON_IsString(action)) {
+                        bool executed = false;
+                        if (strcmp(action->valuestring, "send_ir") == 0) {
+                            cJSON *value = cJSON_GetObjectItem(json, "value");
+                            if (value && cJSON_IsString(value)) {
+                                ESP_LOGI(TAG, "Executing IR Command from Firebase");
+                                char *val_copy = strdup(value->valuestring);
+                                if (val_copy) {
+                                    uint16_t *durations = malloc(sizeof(uint16_t) * 256);
+                                    size_t count = 0;
+                                    char *token = strtok(val_copy, ",");
+                                    while (token != NULL && count < 256) {
+                                        durations[count++] = (uint16_t)atoi(token);
+                                        token = strtok(NULL, ",");
+                                    }
+                                    if (count > 0) {
+                                        ir_send_raw(durations, count, 38000);
+                                    }
+                                    free(durations);
+                                    free(val_copy);
+                                    executed = true;
                                 }
-                                if (count > 0) {
-                                    ir_send_raw(durations, count, 38000); // 38kHz default
+                            }
+                        } else if (strcmp(action->valuestring, "set_relay") == 0) {
+                            cJSON *pin = cJSON_GetObjectItem(json, "pin");
+                            cJSON *val = cJSON_GetObjectItem(json, "value");
+                            if (pin && val) {
+                                ESP_LOGI(TAG, "Executing Set Relay Command from Firebase: pin %d = %d", pin->valueint, val->valueint);
+                                gpio_set_relay_state(pin->valueint, val->valueint);
+                                
+                                int endpoint = 1;
+                                if (pin->valueint == RELAY_2_PIN) endpoint = 2;
+                                else if (pin->valueint == RELAY_3_PIN) endpoint = 3;
+                                else if (pin->valueint == RELAY_4_PIN) endpoint = 4;
+                                
+                                char update_buf[128];
+                                snprintf(update_buf, sizeof(update_buf), 
+                                         "{\"event\": \"relay_update\", \"endpoint\": %d, \"state\": %d}", 
+                                         endpoint, val->valueint);
+                                ws_server_broadcast(update_buf);
+                                executed = true;
+                            }
+                        } else if (strcmp(action->valuestring, "set_pwm") == 0) {
+                            cJSON *pin = cJSON_GetObjectItem(json, "pin");
+                            cJSON *val = cJSON_GetObjectItem(json, "value");
+                            if (pin && val) {
+                                ESP_LOGI(TAG, "Executing Set PWM Command from Firebase: pin %d = %d", pin->valueint, val->valueint);
+                                pwm_set_duty(pin->valueint, val->valueint);
+                                
+                                int endpoint = 5;
+                                if (pin->valueint == PWM_RGB_R_PIN || pin->valueint == PWM_RGB_G_PIN || pin->valueint == PWM_RGB_B_PIN) {
+                                    endpoint = 6;
                                 }
-                                free(durations);
-                                free(val_copy);
+                                
+                                char update_buf[128];
+                                snprintf(update_buf, sizeof(update_buf), 
+                                         "{\"event\": \"pwm_update\", \"endpoint\": %d, \"level\": %d}", 
+                                         endpoint, val->valueint);
+                                ws_server_broadcast(update_buf);
+                                executed = true;
+                            }
+                        } else if (strcmp(action->valuestring, "control_ac") == 0) {
+                            cJSON *is_on = cJSON_GetObjectItem(json, "isOn");
+                            cJSON *target_temp = cJSON_GetObjectItem(json, "target_temp");
+                            
+                            ESP_LOGI(TAG, "Executing Control AC Command from Firebase");
+                            if (target_temp) {
+                                nvs_save_target_temp(target_temp->valueint);
+                            }
+                            if (is_on) {
+                                gpio_set_relay_state(RELAY_3_PIN, is_on->valueint);
                             }
                             
+                            char update_buf[128];
+                            snprintf(update_buf, sizeof(update_buf), 
+                                     "{\"event\": \"ac_update\", \"isOn\": %s, \"target_temp\": %d}", 
+                                     (is_on && is_on->valueint) ? "true" : "false", 
+                                     target_temp ? target_temp->valueint : nvs_get_target_temp(24));
+                            ws_server_broadcast(update_buf);
+                            executed = true;
+                        } else if (strcmp(action->valuestring, "ir_learn") == 0) {
+                            ESP_LOGI(TAG, "Executing IR Learn Command from Firebase");
+                            ir_manager_start_learning();
+                            executed = true;
+                        }
+                        
+                        if (executed) {
                             // Delete command after execution
                             firebase_http_request("commands", "DELETE", NULL, NULL);
+                            // Push the newly updated state to Firebase immediately
+                            firebase_update_full_state();
                         }
                     }
                     cJSON_Delete(json);
