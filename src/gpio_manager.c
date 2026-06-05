@@ -26,7 +26,7 @@ void gpio_manager_init(void) {
 void gpio_set_relay_state(uint8_t pin, int state) {
     gpio_set_level(pin, state);
     nvs_save_pin_state(pin, state);
-    ESP_LOGI(TAG, "Set Relay %d to %d", pin, state);
+    ESP_LOGI(TAG, "Relay Pin %d ➔ %s", pin, state ? "\033[1;32m[ ON ]\033[0m" : "\033[1;31m[ OFF ]\033[0m");
 }
 
 int gpio_get_relay_state(uint8_t pin) {
