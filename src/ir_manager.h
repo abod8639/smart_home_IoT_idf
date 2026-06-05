@@ -3,9 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-
-#define IR_TX_PIN 33
-#define IR_RX_PIN 32
+#include "device_config.h"   // Pin definitions (IR_TX_PIN, IR_RX_PIN)
 
 void ir_manager_init(void);
 void ir_send_raw(uint16_t* durations, size_t length, uint32_t freq_hz);
