@@ -70,6 +70,7 @@ void ir_send_raw(uint16_t* durations, size_t length, uint32_t freq_hz) {
 #include "driver/gpio.h"
 #include "cJSON.h"
 #include "ws_server.h"
+#include "firebase_manager.h"
 #include "rom/ets_sys.h"
 
 static void ir_rx_task(void *pvParameters) {
@@ -139,6 +140,9 @@ static void ir_rx_task(void *pvParameters) {
 
         char *json_str = cJSON_PrintUnformatted(root);
         ws_server_broadcast(json_str);
+
+        // Update Firebase
+        firebase_update_ir_signal("RAW", val_str);
 
         free(json_str);
         cJSON_Delete(root);

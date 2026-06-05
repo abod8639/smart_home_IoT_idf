@@ -94,13 +94,13 @@ esp_err_t firebase_update_status(const char* status) {
     return firebase_http_request("", "PATCH", payload, NULL);
 }
 
-esp_err_t firebase_update_ir_signal(const char* protocol, uint32_t ir_value) {
-    char payload[128];
+esp_err_t firebase_update_ir_signal(const char* protocol, const char* ir_value_str) {
+    char payload[1024]; // Increase size in case of long raw string
     struct timeval tv;
     gettimeofday(&tv, NULL);
     snprintf(payload, sizeof(payload), 
-             "{\"ir_signal\": {\"protocol\": \"%s\", \"last_value\": \"0x%X\", \"timestamp\": %ld}}", 
-             protocol, (unsigned int)ir_value, (long)tv.tv_sec);
+             "{\"ir_signal\": {\"protocol\": \"%s\", \"last_value\": \"%s\", \"timestamp\": %ld}}", 
+             protocol, ir_value_str, (long)tv.tv_sec);
     return firebase_http_request("", "PATCH", payload, NULL);
 }
 
@@ -122,11 +122,23 @@ static void firebase_poll_task(void *pvParameters) {
                     
                     if (action && cJSON_IsString(action) && strcmp(action->valuestring, "send_ir") == 0) {
                         if (value && cJSON_IsString(value)) {
-                            // Convert string hex to uint32
-                            uint32_t ir_code = (uint32_t)strtol(value->valuestring, NULL, 16);
-                            ESP_LOGI(TAG, "Executing IR Command from Firebase: 0x%X", (unsigned int)ir_code);
-                            // Assuming protocol NEC as default or fetch from JSON
-                            ir_manager_send("NEC", ir_code);
+                            ESP_LOGI(TAG, "Executing IR Command from Firebase");
+                            // Value is expected to be comma-separated integers, e.g. "9000,4500,560..."
+                            char *val_copy = strdup(value->valuestring);
+                            if (val_copy) {
+                                uint16_t *durations = malloc(sizeof(uint16_t) * 256); // max 256 transitions
+                                size_t count = 0;
+                                char *token = strtok(val_copy, ",");
+                                while (token != NULL && count < 256) {
+                                    durations[count++] = (uint16_t)atoi(token);
+                                    token = strtok(NULL, ",");
+                                }
+                                if (count > 0) {
+                                    ir_send_raw(durations, count, 38000); // 38kHz default
+                                }
+                                free(durations);
+                                free(val_copy);
+                            }
                             
                             // Delete command after execution
                             firebase_http_request("commands", "DELETE", NULL, NULL);
