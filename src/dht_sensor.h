@@ -2,8 +2,7 @@
 #define DHT_SENSOR_H
 
 #include "esp_err.h"
-
-#define DHT_PIN 4
+#include "device_config.h"   // Pin definitions (DHT_PIN)
 
 // Initialize DHT
 void dht_sensor_init(void);
