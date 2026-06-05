@@ -3,19 +3,20 @@
 
 #include <stdint.h>
 #include "esp_err.h"
+#include "device_config.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// Replace these with your actual Firebase Project URL and Secret
-// e.g., "https://my-project-default-rtdb.firebaseio.com"
-#define FIREBASE_BASE_URL "https://smart-home-69271-default-rtdb.firebaseio.com"
+// ---------------------------------------------------------------------------
+// Firebase Configuration
+// ---------------------------------------------------------------------------
+// Replace with your actual Firebase Project URL.
+#define FIREBASE_BASE_URL    "https://smart-home-69271-default-rtdb.firebaseio.com"
 
 // If you have a Database Secret, put it here. Otherwise leave it empty if rules are open.
 #define FIREBASE_AUTH_SECRET ""
-
-#define FIREBASE_DEVICE_ID "esp32_smart_home_1"
 
 /**
  * @brief Initialize the Firebase manager.
@@ -40,6 +41,12 @@ esp_err_t firebase_update_status(const char* status);
  * @brief Update the full device state to Firebase
  */
 esp_err_t firebase_update_full_state(void);
+
+/**
+ * @brief Request an asynchronous full state update from any task.
+ *        Thread-safe (uses an event group bit).
+ */
+void firebase_trigger_update(void);
 
 #ifdef __cplusplus
 }
