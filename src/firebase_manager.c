@@ -12,7 +12,7 @@
 #include "pwm_manager.h"
 #include "dht_sensor.h"
 #include "nvs_manager.h"
-#include "ws_server.h"
+#include "mqtt_manager.h"
 #include "esp_system.h"
 #include <string.h>
 #include <time.h>
@@ -78,6 +78,10 @@ static esp_err_t firebase_http_request(const char *path, const char *method,
     if (err == ESP_OK) {
         int status_code    = esp_http_client_get_status_code(client);
         int content_length = esp_http_client_get_content_length(client);
+
+        if (status_code != 200 && status_code != 204) {
+            ESP_LOGW(TAG, "\033[1;33m[HTTP Warning]\033[0m %s response status code: %d", method, status_code);
+        }
 
         if (response_data && status_code == 200) {
             if (content_length > 0) {
@@ -171,6 +175,12 @@ esp_err_t firebase_update_ir_signal(const char *protocol, const char *ir_value_s
 // Poll task
 // ---------------------------------------------------------------------------
 
+volatile bool g_firebase_needs_update = false;
+
+void firebase_trigger_update(void) {
+    g_firebase_needs_update = true;
+}
+
 static void firebase_poll_task(void *pvParameters) {
     // Wait until WiFi has a valid IP before attempting any HTTP request.
     // This eliminates the boot-time flood of ESP_ERR_HTTP_CONNECT errors.
@@ -182,6 +192,11 @@ static void firebase_poll_task(void *pvParameters) {
     firebase_update_status("online");
 
     while (1) {
+        if (g_firebase_needs_update) {
+            g_firebase_needs_update = false;
+            firebase_update_full_state();
+        }
+
         // Only poll when connected
         EventBits_t bits = xEventGroupGetBits(g_wifi_event_group);
         if (!(bits & WIFI_CONNECTED_BIT)) {
@@ -233,7 +248,7 @@ static void firebase_poll_task(void *pvParameters) {
                                 snprintf(update_buf, sizeof(update_buf),
                                          "{\"event\":\"relay_update\",\"endpoint\":%d,\"state\":%d}",
                                          endpoint, val->valueint);
-                                ws_server_broadcast(update_buf);
+                                mqtt_manager_publish_event(update_buf);
                                 executed = true;
                             }
 
@@ -252,7 +267,7 @@ static void firebase_poll_task(void *pvParameters) {
                                 snprintf(update_buf, sizeof(update_buf),
                                          "{\"event\":\"pwm_update\",\"endpoint\":%d,\"level\":%d}",
                                          endpoint, val->valueint);
-                                ws_server_broadcast(update_buf);
+                                mqtt_manager_publish_event(update_buf);
                                 executed = true;
                             }
 
@@ -271,7 +286,7 @@ static void firebase_poll_task(void *pvParameters) {
                             snprintf(update_buf, sizeof(update_buf),
                                      "{\"event\":\"ac_update\",\"isOn\":%s,\"target_temp\":%d}",
                                      (is_on && is_on->valueint) ? "true" : "false", tgt);
-                            ws_server_broadcast(update_buf);
+                            mqtt_manager_publish_event(update_buf);
                             executed = true;
 
                         } else if (strcmp(action->valuestring, "ir_learn") == 0) {
