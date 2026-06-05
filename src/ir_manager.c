@@ -104,92 +104,166 @@ void ir_send_raw(uint16_t *durations, size_t length, uint32_t freq_hz) {
 // IR Learning Task
 // ---------------------------------------------------------------------------
 
+static bool IRAM_ATTR rmt_rx_done_callback(
+    rmt_channel_handle_t channel, const rmt_rx_done_event_data_t *event_data,
+    void *user_data) {
+  TaskHandle_t task_handle = (TaskHandle_t)user_data;
+  BaseType_t high_task_wakeup = pdFALSE;
+  xTaskNotifyFromISR(task_handle, event_data->num_symbols,
+                     eSetValueWithOverwrite, &high_task_wakeup);
+  return high_task_wakeup == pdTRUE;
+}
+
 static void ir_rx_task(void *pvParameters) {
-    ESP_LOGI(TAG, "\033[1;35m[IR]\033[0m Learning mode started — listening on GPIO %d...", IR_RX_PIN);
-    gpio_set_direction((gpio_num_t)IR_RX_PIN, GPIO_MODE_INPUT);
-    gpio_set_pull_mode((gpio_num_t)IR_RX_PIN, GPIO_PULLUP_ONLY);
+  ESP_LOGI(
+      TAG,
+      "\033[1;35m[IR]\033[0m Learning mode started — listening on GPIO %d...",
+      IR_RX_PIN);
 
-    // Wait for the pin to go LOW (start of IR burst), 10 s timeout
-    int timeout_ms = 10000;
-    int elapsed_ms = 0;
-    while (gpio_get_level((gpio_num_t)IR_RX_PIN) == 1 && elapsed_ms < timeout_ms) {
-        vTaskDelay(pdMS_TO_TICKS(10));
-        elapsed_ms += 10;
-    }
+  // 1. Configure RMT RX Channel
+  rmt_channel_handle_t rx_chan = NULL;
+  rmt_rx_channel_config_t rx_config = {
+      .gpio_num = (gpio_num_t)IR_RX_PIN,
+      .clk_src = RMT_CLK_SRC_DEFAULT,
+      .resolution_hz = 1000000, // 1 MHz (1 tick = 1 microsecond)
+      .mem_block_symbols = 64,  // 64 symbols = up to 128 transitions
+      .flags = {
+          .invert_in = true, // Invert input so active-low IR receiver pulse is
+                             // seen as active-high (1)
+      }};
 
-    if (elapsed_ms >= timeout_ms) {
-        ESP_LOGW(TAG, "IR learning timeout — no signal detected");
-        mqtt_manager_publish_event("{\"event\":\"ir_learn_status\",\"status\":\"timeout\"}");
-        s_ir_rx_task_handle = NULL;
-        vTaskDelete(NULL);
-        return;
-    }
+  if (rmt_new_rx_channel(&rx_config, &rx_chan) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to create RMT RX channel");
+    mqtt_manager_publish_event(
+        "{\"event\":\"ir_learn_status\",\"status\":\"error\",\"message\":"
+        "\"Failed to init RMT RX\"}");
+    s_ir_rx_task_handle = NULL;
+    vTaskDelete(NULL);
+    return;
+  }
 
-    // Capture transitions (up to 128) for at most 100 ms
-    uint16_t *raw_buf = malloc(sizeof(uint16_t) * 128);
-    if (!raw_buf) {
-        s_ir_rx_task_handle = NULL;
-        vTaskDelete(NULL);
-        return;
-    }
+  // 2. Register callback to notify this task when reception is complete
+  rmt_rx_event_callbacks_t cbs = {
+      .on_recv_done = rmt_rx_done_callback,
+  };
+  if (rmt_rx_register_event_callbacks(rx_chan, &cbs,
+                                      xTaskGetCurrentTaskHandle()) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to register RMT RX callbacks");
+    rmt_del_channel(rx_chan);
+    mqtt_manager_publish_event(
+        "{\"event\":\"ir_learn_status\",\"status\":\"error\",\"message\":"
+        "\"Failed to register callback\"}");
+    s_ir_rx_task_handle = NULL;
+    vTaskDelete(NULL);
+    return;
+  }
 
-    int count = 0;
-    int last_level = 0;
-    uint32_t last_time = (uint32_t)esp_timer_get_time();
-    uint32_t start_capture = last_time;
+  // 3. Enable RMT RX channel
+  if (rmt_enable(rx_chan) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to enable RMT RX channel");
+    rmt_del_channel(rx_chan);
+    s_ir_rx_task_handle = NULL;
+    vTaskDelete(NULL);
+    return;
+  }
 
-    while (count < 128 && ((uint32_t)esp_timer_get_time() - start_capture) < 100000U) {
-        int level = gpio_get_level((gpio_num_t)IR_RX_PIN);
-        if (level != last_level) {
-            uint32_t now  = (uint32_t)esp_timer_get_time();
-            uint32_t diff = now - last_time;
-            if (diff > 100) { // Ignore glitches < 100 µs
-                raw_buf[count++] = (uint16_t)(diff > 0xFFFF ? 0xFFFF : diff);
-                last_time  = now;
-                last_level = level;
-            }
+  // 4. Start receiving
+  rmt_symbol_word_t receive_buffer[64];
+  rmt_receive_config_t receive_config = {
+      .signal_range_min_ns = 1000,    // ignore pulses shorter than 1us (glitch filter)
+      .signal_range_max_ns = 30000000, // 30ms of silence terminates capture (end of IR frame)
+  };
+
+  if (rmt_receive(rx_chan, receive_buffer, sizeof(receive_buffer),
+                  &receive_config) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to start RMT RX receive");
+    rmt_disable(rx_chan);
+    rmt_del_channel(rx_chan);
+    s_ir_rx_task_handle = NULL;
+    vTaskDelete(NULL);
+    return;
+  }
+
+  // 5. Wait for notification (from ISR callback) with a 10s timeout
+  uint32_t num_symbols = 0;
+  BaseType_t notify_recv =
+      xTaskNotifyWait(0, 0, &num_symbols, pdMS_TO_TICKS(10000));
+
+  if (notify_recv == pdFALSE) {
+    ESP_LOGW(TAG, "IR learning timeout — no signal detected within 10s");
+    mqtt_manager_publish_event(
+        "{\"event\":\"ir_learn_status\",\"status\":\"timeout\"}");
+  } else {
+    ESP_LOGI(TAG, "IR signal captured! Received %lu symbols",
+             (unsigned long)num_symbols);
+    if (num_symbols > 5) {
+      // Convert RMT symbols to comma-separated microseconds durations
+      int max_durations = num_symbols * 2;
+      uint16_t *raw_buf = malloc(sizeof(uint16_t) * max_durations);
+      if (!raw_buf) {
+        ESP_LOGE(TAG, "Failed to allocate memory for raw durations");
+        mqtt_manager_publish_event("{\"event\":\"ir_learn_status\",\"status\":"
+                                   "\"error\",\"message\":\"Out of memory\"}");
+        goto cleanup;
+      }
+
+      int count = 0;
+      for (uint32_t i = 0; i < num_symbols; i++) {
+        rmt_symbol_word_t sym = receive_buffer[i];
+        if (sym.duration0 > 0) {
+          raw_buf[count++] = sym.duration0;
         }
-        ets_delay_us(10);
-    }
-
-    if (count > 10) {
-        // Build comma-separated string safely using snprintf + offset tracking.
-        // uint16_t max = 65535 (5 digits) + comma = 6 chars per sample.
-        int buf_size = count * 7 + 1;
-        char *val_str = malloc(buf_size);
-        if (!val_str) goto cleanup;
-
-        int offset = 0;
-        for (int i = 0; i < count; i++) {
-            offset += snprintf(val_str + offset, buf_size - offset,
-                               "%u%s", (unsigned)raw_buf[i], (i < count - 1) ? "," : "");
+        if (sym.duration1 > 0) {
+          raw_buf[count++] = sym.duration1;
         }
+      }
 
-        // Broadcast result via WebSocket
-        cJSON *root = cJSON_CreateObject();
-        cJSON_AddStringToObject(root, "event",    "ir_learn_status");
-        cJSON_AddStringToObject(root, "status",   "ok");
-        cJSON_AddStringToObject(root, "protocol", "RAW");
-        cJSON_AddStringToObject(root, "value",    val_str);
-        cJSON_AddNumberToObject(root, "bits",     count);
-        cJSON_AddNumberToObject(root, "frequency", 38);
+      // Build comma-separated string safely
+      int buf_size = count * 7 + 1;
+      char *val_str = malloc(buf_size);
+      if (!val_str) {
+        free(raw_buf);
+        mqtt_manager_publish_event("{\"event\":\"ir_learn_status\",\"status\":"
+                                   "\"error\",\"message\":\"Out of memory\"}");
+        goto cleanup;
+      }
 
-        char *json_str = cJSON_PrintUnformatted(root);
-        mqtt_manager_publish_event(json_str);
-        firebase_update_ir_signal("RAW", val_str);
+      int offset = 0;
+      for (int i = 0; i < count; i++) {
+        offset += snprintf(val_str + offset, buf_size - offset, "%u%s",
+                           (unsigned)raw_buf[i], (i < count - 1) ? "," : "");
+      }
 
-        free(json_str);
-        cJSON_Delete(root);
-        free(val_str);
+      // Broadcast result via MQTT and Firebase
+      cJSON *root = cJSON_CreateObject();
+      cJSON_AddStringToObject(root, "event", "ir_learn_status");
+      cJSON_AddStringToObject(root, "status", "ok");
+      cJSON_AddStringToObject(root, "protocol", "RAW");
+      cJSON_AddStringToObject(root, "value", val_str);
+      cJSON_AddNumberToObject(root, "bits", count);
+      cJSON_AddNumberToObject(root, "frequency", 38);
+
+      char *json_str = cJSON_PrintUnformatted(root);
+      mqtt_manager_publish_event(json_str);
+      firebase_update_ir_signal("RAW", val_str);
+
+      free(json_str);
+      cJSON_Delete(root);
+      free(val_str);
+      free(raw_buf);
     } else {
-        mqtt_manager_publish_event("{\"event\":\"ir_learn_status\",\"status\":\"error\","
-                            "\"message\":\"Signal too short\"}");
+      mqtt_manager_publish_event("{\"event\":\"ir_learn_status\",\"status\":"
+                                 "\"error\",\"message\":\"Signal too short\"}");
     }
+  }
 
 cleanup:
-    free(raw_buf);
-    s_ir_rx_task_handle = NULL; // Allow a new learning session
-    vTaskDelete(NULL);
+  // 6. Cleanup RMT channel
+  rmt_disable(rx_chan);
+  rmt_del_channel(rx_chan);
+
+  s_ir_rx_task_handle = NULL; // Allow a new learning session
+  vTaskDelete(NULL);
 }
 
 void ir_manager_start_learning(void) {
