@@ -2,7 +2,7 @@
 extern "C" {
 #include "gpio_manager.h"
 #include "pwm_manager.h"
-#include "ws_server.h"
+#include "mqtt_manager.h"
 }
 #include "esp_log.h"
 #include <stdio.h>
@@ -32,19 +32,19 @@ static esp_err_t app_attribute_update_cb(callback_type_t type, uint16_t endpoint
             else if (endpoint_id == 3) gpio_set_relay_state(RELAY_3_PIN, state);
             else if (endpoint_id == 4) gpio_set_relay_state(RELAY_4_PIN, state);
             
-            // Broadcast state via WebSocket
+            // Broadcast state via MQTT
             char buf[128];
             snprintf(buf, sizeof(buf), "{\"event\": \"relay_update\", \"endpoint\": %d, \"state\": %d}", endpoint_id, state);
-            ws_server_broadcast(buf);
+            mqtt_manager_publish_event(buf);
         }
         else if (cluster_id == chip::app::Clusters::LevelControl::Id && attribute_id == chip::app::Clusters::LevelControl::Attributes::CurrentLevel::Id) {
             uint8_t brightness = val->val.u8;
             if (endpoint_id == 5) pwm_set_duty(PWM_LAMP_PIN, brightness);
             
-            // Broadcast state via WebSocket
+            // Broadcast state via MQTT
             char buf[128];
             snprintf(buf, sizeof(buf), "{\"event\": \"pwm_update\", \"endpoint\": %d, \"level\": %d}", endpoint_id, brightness);
-            ws_server_broadcast(buf);
+            mqtt_manager_publish_event(buf);
         }
     }
     return ESP_OK;
