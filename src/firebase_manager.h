@@ -36,6 +36,11 @@ esp_err_t firebase_update_ir_signal(const char* protocol, const char* ir_value_s
  */
 esp_err_t firebase_update_status(const char* status);
 
+/**
+ * @brief Update the full device state to Firebase
+ */
+esp_err_t firebase_update_full_state(void);
+
 #ifdef __cplusplus
 }
 #endif
