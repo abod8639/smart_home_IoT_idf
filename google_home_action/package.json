@@ -1,0 +1,12 @@
+{
+  "name": "google-home-action-local",
+  "version": "1.0.0",
+  "description": "Local webhook and OAuth server bridging Google Home to Firebase Realtime Database for ESP32",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
