@@ -1,6 +1,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include "esp_log.h"
+#include <stdio.h>
 
 extern "C" {
 #include "nvs_manager.h"
@@ -16,8 +18,50 @@ extern "C" {
 
 static const char *TAG = "MAIN_APP";
 
+// ---------------------------------------------------------------------------
+// DHT22 Monitoring Task
+// Runs independently so app_main is not blocked by the 20 ms start signal
+// or by firebase_update_full_state() network latency.
+// ---------------------------------------------------------------------------
+static void dht_monitor_task(void *pvParameters) {
+    // Wait for WiFi before sending any data
+    xEventGroupWaitBits(g_wifi_event_group, WIFI_CONNECTED_BIT,
+                        pdFALSE, pdTRUE, portMAX_DELAY);
+
+    while (true) {
+        float temp = 0.0f, hum = 0.0f;
+        esp_err_t err = dht_sensor_read(&temp, &hum);
+
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "\033[1;36m[DHT22]\033[0m Climate readout ➔ "
+                          "Temp: \033[1;36m%.1f°C\033[0m | Hum: \033[1;35m%.1f%%\033[0m",
+                     temp, hum);
+
+            // Broadcast sensor data via WebSocket
+            char buf[96];
+            snprintf(buf, sizeof(buf),
+                     "{\"event\":\"sensor_data\",\"temperature\":%.1f,\"humidity\":%.1f}",
+                     temp, hum);
+            ws_server_broadcast(buf);
+
+            // Sync full device state to Firebase
+            firebase_update_full_state();
+
+        } else if (err == ESP_ERR_INVALID_CRC) {
+            ESP_LOGW(TAG, "\033[1;33m[DHT22]\033[0m Checksum error — retrying next cycle");
+        } else {
+            ESP_LOGW(TAG, "\033[1;33m[DHT22]\033[0m Read timeout — sensor may not be connected");
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10000)); // 10 s between reads
+    }
+}
+
+// ---------------------------------------------------------------------------
+// app_main — linear init, then hands off to tasks
+// ---------------------------------------------------------------------------
 extern "C" void app_main() {
-    // Print ASCII Art Logo using direct printf to avoid ESP_LOG prefix
+    // ASCII Art banner (direct printf avoids ESP_LOG timestamp prefix)
     printf("\033[1;36m"
            "  _____                      _     _    _                      \n"
            " / ____|                    | |   | |  | |                     \n"
@@ -29,7 +73,7 @@ extern "C" void app_main() {
 
     ESP_LOGI(TAG, "\033[1;32m[SYSTEM]\033[0m Starting Smart Home IoT Application...");
 
-    // 1. Storage
+    // 1. Storage (must be first — NVS is used by all other managers)
     ESP_LOGI(TAG, "\033[1;35m[STORAGE]\033[0m Initializing NVS Storage...");
     nvs_manager_init();
 
@@ -43,38 +87,27 @@ extern "C" void app_main() {
     ESP_LOGI(TAG, "\033[1;36m[SENSOR]\033[0m Initializing DHT22 Climate Sensor...");
     dht_sensor_init();
 
-    // 3. Network
+    // 3. Network — starts WiFi and creates g_wifi_event_group
     ESP_LOGI(TAG, "\033[1;34m[NETWORK]\033[0m Initializing Wi-Fi Manager...");
     wifi_manager_init();
 
-    // 4. WebSocket Server
+    // 4. Network-dependent services — start immediately; they wait
+    //    internally for WIFI_CONNECTED_BIT before sending anything.
     ESP_LOGI(TAG, "\033[1;32m[SERVICES]\033[0m Starting WebSocket Server...");
     ws_server_start();
 
-    // 5. Matter Integration
     ESP_LOGI(TAG, "\033[1;32m[SERVICES]\033[0m Initializing Matter Integration...");
     matter_manager_init();
 
-    // 6. Firebase Integration
     ESP_LOGI(TAG, "\033[1;32m[SERVICES]\033[0m Initializing Firebase Integration...");
     firebase_manager_init();
 
-    ESP_LOGI(TAG, "\033[1;32m[SYSTEM]\033[0m Application started successfully.");
-    
-    // Main loop
-    while (true) {
-        float temp = 0.0, hum = 0.0;
-        if (dht_sensor_read(&temp, &hum) == ESP_OK) {
-            ESP_LOGI(TAG, "\033[1;36m[DHT22]\033[0m Climate readout ➔ Temp: \033[1;36m%.1f°C\033[0m | Hum: \033[1;35m%.1f%%\033[0m", temp, hum);
-            
-            // Broadcast sensor data via WebSockets periodically
-            char buf[128];
-            snprintf(buf, sizeof(buf), "{\"event\":\"sensor_data\",\"temperature\":%.1f,\"humidity\":%.1f}", temp, hum);
-            ws_server_broadcast(buf);
+    // 5. Sensor monitoring task — waits for WiFi, then runs independently
+    ESP_LOGI(TAG, "\033[1;32m[SERVICES]\033[0m Starting DHT22 monitor task...");
+    xTaskCreate(dht_monitor_task, "dht_monitor", 4096, NULL, 3, NULL);
 
-            // Update full state to Firebase
-            firebase_update_full_state();
-        }
-        vTaskDelay(10000 / portTICK_PERIOD_MS); // Update every 10 seconds
-    }
+    ESP_LOGI(TAG, "\033[1;32m[SYSTEM]\033[0m All services started. Waiting for WiFi...");
+
+    // app_main task can now be deleted — all work is done in dedicated tasks.
+    vTaskDelete(NULL);
 }
