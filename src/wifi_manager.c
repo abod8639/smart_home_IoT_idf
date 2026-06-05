@@ -1,4 +1,5 @@
 #include "wifi_manager.h"
+#include "wifi_credentials.h"  // gitignored — edit WIFI_SSID / WIFI_PASSWORD there
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_netif.h"
@@ -58,12 +59,12 @@ void wifi_manager_init(void) {
                                                         NULL,
                                                         &instance_got_ip));
 
-    // Credentials are managed via menuconfig (pio run -t menuconfig)
-    // and stored securely in sdkconfig — never hardcoded in source.
+    // Credentials are defined in src/wifi_credentials.h (gitignored).
+    // Edit that file to set your SSID/password — it is never committed.
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid     = CONFIG_WIFI_SSID,
-            .password = CONFIG_WIFI_PASSWORD,
+            .ssid     = WIFI_SSID,
+            .password = WIFI_PASSWORD,
         },
     };
 
