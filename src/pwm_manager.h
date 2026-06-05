@@ -10,5 +10,6 @@
 
 void pwm_manager_init(void);
 void pwm_set_duty(uint8_t pin, uint32_t duty);
+uint32_t pwm_get_duty(uint8_t pin);
 
 #endif // PWM_MANAGER_H
