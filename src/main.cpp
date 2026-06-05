@@ -10,6 +10,7 @@ extern "C" {
 #include "dht_sensor.h"
 #include "wifi_manager.h"
 #include "ws_server.h"
+#include "firebase_manager.h"
 }
 #include "matter_manager.h"
 
@@ -37,6 +38,9 @@ extern "C" void app_main() {
 
     // 5. Matter Integration
     matter_manager_init();
+
+    // 6. Firebase Integration
+    firebase_manager_init();
 
     ESP_LOGI(TAG, "Application started successfully.");
     
