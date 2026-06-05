@@ -33,14 +33,17 @@ void pwm_manager_init(void) {
 
 void pwm_set_duty(uint8_t pin, uint32_t duty) {
     ledc_channel_t channel = LEDC_CHANNEL_0;
-    if (pin == PWM_LAMP_PIN) channel = LEDC_CHANNEL_0;
-    else if (pin == PWM_RGB_R_PIN) channel = LEDC_CHANNEL_1;
-    else if (pin == PWM_RGB_G_PIN) channel = LEDC_CHANNEL_2;
-    else if (pin == PWM_RGB_B_PIN) channel = LEDC_CHANNEL_3;
+    const char* pin_name = "PWM_UNKNOWN";
+    if (pin == PWM_LAMP_PIN) { channel = LEDC_CHANNEL_0; pin_name = "LAMP"; }
+    else if (pin == PWM_RGB_R_PIN) { channel = LEDC_CHANNEL_1; pin_name = "RGB_RED"; }
+    else if (pin == PWM_RGB_G_PIN) { channel = LEDC_CHANNEL_2; pin_name = "RGB_GREEN"; }
+    else if (pin == PWM_RGB_B_PIN) { channel = LEDC_CHANNEL_3; pin_name = "RGB_BLUE"; }
 
     ledc_set_duty(LEDC_LOW_SPEED_MODE, channel, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, channel);
-    ESP_LOGD(TAG, "Set PWM pin %d to duty %d", pin, duty);
+    
+    int pct = (duty * 100) / 255;
+    ESP_LOGI(TAG, "PWM [%s] Pin %d ➔ Duty: \033[1;35m%d\033[0m (%d%%)", pin_name, pin, (int)duty, pct);
 }
 
 uint32_t pwm_get_duty(uint8_t pin) {
