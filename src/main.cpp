@@ -11,7 +11,7 @@ extern "C" {
 #include "ir_manager.h"
 #include "dht_sensor.h"
 #include "wifi_manager.h"
-#include "ws_server.h"
+#include "mqtt_manager.h"
 #include "firebase_manager.h"
 }
 #include "matter_manager.h"
@@ -42,7 +42,7 @@ static void dht_monitor_task(void *pvParameters) {
             snprintf(buf, sizeof(buf),
                      "{\"event\":\"sensor_data\",\"temperature\":%.1f,\"humidity\":%.1f}",
                      temp, hum);
-            ws_server_broadcast(buf);
+            mqtt_manager_publish_sensor(buf);
 
             // Sync full device state to Firebase
             firebase_update_full_state();
@@ -93,8 +93,8 @@ extern "C" void app_main() {
 
     // 4. Network-dependent services — start immediately; they wait
     //    internally for WIFI_CONNECTED_BIT before sending anything.
-    ESP_LOGI(TAG, "\033[1;32m[SERVICES]\033[0m Starting WebSocket Server...");
-    ws_server_start();
+    ESP_LOGI(TAG, "\033[1;32m[SERVICES]\033[0m Starting MQTT Manager...");
+    mqtt_manager_init();
 
     ESP_LOGI(TAG, "\033[1;32m[SERVICES]\033[0m Initializing Matter Integration...");
     matter_manager_init();
