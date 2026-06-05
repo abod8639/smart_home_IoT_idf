@@ -54,6 +54,9 @@ extern "C" void app_main() {
             char buf[128];
             snprintf(buf, sizeof(buf), "{\"event\":\"sensor_data\",\"temperature\":%.1f,\"humidity\":%.1f}", temp, hum);
             ws_server_broadcast(buf);
+
+            // Update full state to Firebase
+            firebase_update_full_state();
         }
         vTaskDelay(10000 / portTICK_PERIOD_MS); // Update every 10 seconds
     }
