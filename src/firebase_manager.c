@@ -160,13 +160,22 @@ esp_err_t firebase_update_full_state(void) {
 }
 
 esp_err_t firebase_update_ir_signal(const char *protocol, const char *ir_value_str) {
-    char payload[1024];
+    size_t size = strlen(protocol) + strlen(ir_value_str) + 128;
+    char *payload = malloc(size);
+    if (!payload) {
+        ESP_LOGE(TAG, "Failed to allocate memory for IR signal payload");
+        return ESP_ERR_NO_MEM;
+    }
+    
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    snprintf(payload, sizeof(payload),
+    snprintf(payload, size,
              "{\"ir_signal\": {\"protocol\": \"%s\", \"last_value\": \"%s\", \"timestamp\": %ld}}",
              protocol, ir_value_str, (long)tv.tv_sec);
-    return firebase_http_request("", "PATCH", payload, NULL);
+             
+    esp_err_t err = firebase_http_request("", "PATCH", payload, NULL);
+    free(payload);
+    return err;
 }
 
 void firebase_trigger_update(void) {
@@ -257,7 +266,7 @@ esp_err_t firebase_manager_init(void) {
         return ESP_ERR_NO_MEM;
     }
 
-    xTaskCreate(firebase_poll_task, "firebase_poll", 4096, NULL, 5, NULL);
+    xTaskCreate(firebase_poll_task, "firebase_poll", 8192, NULL, 5, NULL);
     ESP_LOGI(TAG, "Firebase manager initialized");
     return ESP_OK;
 }
