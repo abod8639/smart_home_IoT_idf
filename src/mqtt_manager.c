@@ -141,6 +141,8 @@ esp_err_t mqtt_manager_init(void) {
         .session.last_will.msg = "offline",
         .session.last_will.qos = 1,
         .session.last_will.retain = 1,
+        .buffer.size = 4096,
+        .buffer.out_size = 4096,
     };
 
     client = esp_mqtt_client_init(&mqtt_cfg);
