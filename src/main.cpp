@@ -17,6 +17,7 @@ extern "C" {
 #include "pwm_manager.h"
 #include "sntp_manager.h"
 #include "wifi_manager.h"
+#include "ac_timer_manager.h"
 }
 #include "matter_manager.h"
 
@@ -106,6 +107,9 @@ extern "C" void app_main() {
     ir_manager_init();
     ESP_LOGI(TAG, "\033[1;36m[SENSOR]\033[0m Initializing DHT22 Climate Sensor...");
     dht_sensor_init();
+    
+    ESP_LOGI(TAG, "\033[1;32m[SERVICES]\033[0m Initializing AC Timer...");
+    ac_timer_manager_init();
 
     // 3. Network — starts WiFi and creates g_wifi_event_group
     ESP_LOGI(TAG, "\033[1;34m[NETWORK]\033[0m Initializing Wi-Fi Manager...");
