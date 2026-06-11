@@ -57,8 +57,8 @@ static void publish_ac_event(bool is_on, int target_temp) {
 static esp_err_t handle_set_relay(const cJSON *json) {
     cJSON *pin = cJSON_GetObjectItem(json, "pin");
     cJSON *val = cJSON_GetObjectItem(json, "value");
-    if (!pin || !val) {
-        ESP_LOGW(TAG, "set_relay: missing pin or value");
+    if (!pin || !val || !cJSON_IsNumber(pin) || !cJSON_IsNumber(val)) {
+        ESP_LOGW(TAG, "set_relay: missing or invalid pin/value");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -82,8 +82,8 @@ static esp_err_t handle_set_relay(const cJSON *json) {
 static esp_err_t handle_set_pwm(const cJSON *json) {
     cJSON *pin = cJSON_GetObjectItem(json, "pin");
     cJSON *val = cJSON_GetObjectItem(json, "value");
-    if (!pin || !val) {
-        ESP_LOGW(TAG, "set_pwm: missing pin or value");
+    if (!pin || !val || !cJSON_IsNumber(pin) || !cJSON_IsNumber(val)) {
+        ESP_LOGW(TAG, "set_pwm: missing or invalid pin/value");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -111,6 +111,9 @@ static esp_err_t handle_set_pwm(const cJSON *json) {
 static esp_err_t handle_control_ac(const cJSON *json) {
     cJSON *is_on      = cJSON_GetObjectItem(json, "isOn");
     cJSON *target_temp = cJSON_GetObjectItem(json, "target_temp");
+
+    if (is_on && !(cJSON_IsNumber(is_on) || cJSON_IsBool(is_on))) return ESP_ERR_INVALID_ARG;
+    if (target_temp && !cJSON_IsNumber(target_temp)) return ESP_ERR_INVALID_ARG;
 
     int tgt = target_temp ? target_temp->valueint : nvs_get_target_temp(24);
 
@@ -140,8 +143,8 @@ static esp_err_t handle_set_ac_timer(const cJSON *json) {
     cJSON *seconds = cJSON_GetObjectItem(json, "seconds");
     cJSON *ir_code = cJSON_GetObjectItem(json, "ir_code");
     
-    if (!seconds) {
-        ESP_LOGW(TAG, "set_ac_timer: missing 'seconds'");
+    if (!seconds || !cJSON_IsNumber(seconds)) {
+        ESP_LOGW(TAG, "set_ac_timer: missing or invalid 'seconds'");
         return ESP_ERR_INVALID_ARG;
     }
     
@@ -158,10 +161,12 @@ static esp_err_t handle_ir_send(const cJSON *json) {
     cJSON *bits     = cJSON_GetObjectItem(json, "bits");
     cJSON *freq     = cJSON_GetObjectItem(json, "frequency");
 
-    if (!protocol || !value || !cJSON_IsString(value)) {
-        ESP_LOGW(TAG, "ir_send: missing protocol or value");
+    if (!protocol || !value || !cJSON_IsString(protocol) || !cJSON_IsString(value)) {
+        ESP_LOGW(TAG, "ir_send: missing or invalid protocol/value");
         return ESP_ERR_INVALID_ARG;
     }
+    if (bits && !cJSON_IsNumber(bits)) return ESP_ERR_INVALID_ARG;
+    if (freq && !cJSON_IsNumber(freq)) return ESP_ERR_INVALID_ARG;
 
     if (strcmp(protocol->valuestring, "RAW") == 0 || strcmp(protocol->valuestring, "UNKNOWN") == 0) {
         int count     = bits ? bits->valueint : 256;
@@ -193,8 +198,13 @@ static esp_err_t handle_ir_send(const cJSON *json) {
         // Handle standard protocols (NEC, SAMSUNG, SONY)
         uint32_t data = (uint32_t)strtoul(value->valuestring, NULL, 16);
         int count = bits ? bits->valueint : 32;
+        if (count <= 0 || count > 64) count = 32;
+        
         int frequency = 38000;
-        uint16_t durations[100];
+        size_t max_items = (count * 2) + 4;
+        uint16_t *durations = malloc(max_items * sizeof(uint16_t));
+        if (!durations) return ESP_ERR_NO_MEM;
+        
         int idx = 0;
 
         if (strcmp(protocol->valuestring, "NEC") == 0) {
@@ -223,10 +233,12 @@ static esp_err_t handle_ir_send(const cJSON *json) {
             }
         } else {
             ESP_LOGW(TAG, "ir_send: unsupported protocol '%s'", protocol->valuestring);
+            free(durations);
             return ESP_ERR_NOT_SUPPORTED;
         }
         ESP_LOGI(TAG, "\033[1;35mIR Send\033[0m ➔ %s (0x%lX, %d bits)", protocol->valuestring, (unsigned long)data, count);
         ir_send_raw(durations, idx, frequency);
+        free(durations);
     }
 
     return ESP_OK;
