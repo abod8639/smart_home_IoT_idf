@@ -40,19 +40,49 @@ A comprehensive smart home device firmware built using the official Espressif Io
 ## System Architecture
 
 ```mermaid
-graph TD
-    ESP32[ESP32 Device] -->|Wi-Fi| Router[Wi-Fi Router]
-    Router -->|MQTT / TCP| HiveMQ[HiveMQ Broker]
-    Router -->|HTTPS REST| Firebase[Firebase RTDB]
+flowchart LR
+    %% Main Components
+    App((📱 Mobile App))
     
-    HiveMQ <-->|Bi-directional Sync| FlutterApp[Flutter Mobile App]
-    Firebase <-->|Fallback Sync| FlutterApp
+    subgraph Cloud [☁️ Cloud Backend]
+        MQTT{HiveMQ Broker}
+        DB[(Firebase DB)]
+    end
     
-    ESP32 -->|GPIO| Relays[Relays & Switches]
-    ESP32 -->|PWM / LEDC| RGB[RGB & Dimmer Lamps]
-    ESP32 -->|RMT| IR[IR Transmitter & Receiver]
-    ESP32 -->|Single-Wire| DHT22[DHT22 Sensor]
+    ESP[⚙️ ESP32 Firmware]
+    
+    subgraph Devices [🔌 Home Devices]
+        direction TB
+        Relays[⚡ Smart Relays]
+        Lights[💡 RGB Lights]
+        Sensor[🌡️ Climate Sensor]
+        IR[📡 IR Blaster]
+    end
+
+    %% Connections
+    App <-->|Realtime Control| MQTT
+    App <-->|Backup Sync| DB
+    
+    MQTT <-->|MQTT Protocol| ESP
+    DB <-->|HTTP REST| ESP
+    
+    ESP ===> Relays
+    ESP ===> Lights
+    ESP ===> Sensor
+    ESP ===> IR
+    
+    %% Styling
+    classDef app fill:#E3F2FD,stroke:#1565C0,stroke-width:2px,color:#000
+    classDef cloud fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    classDef core fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#000
+    classDef hw fill:#FCE4EC,stroke:#C2185B,stroke-width:2px,color:#000
+
+    class App app
+    class MQTT,DB cloud
+    class ESP core
+    class Relays,Lights,Sensor,IR hw
 ```
+
 
 ---
 
