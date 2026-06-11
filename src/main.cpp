@@ -36,6 +36,10 @@ static void dht_monitor_task(void *pvParameters) {
     // Subscribe to task watchdog
     esp_task_wdt_add(NULL);
 
+    float last_sync_temp = -100.0f;
+    float last_sync_hum = -100.0f;
+    TickType_t last_sync_time = 0;
+
     while (true) {
         // Feed the watchdog
         esp_task_wdt_reset();
@@ -55,8 +59,18 @@ static void dht_monitor_task(void *pvParameters) {
                      temp, hum);
             mqtt_manager_publish_sensor(buf);
 
-            // Sync full device state to Firebase
-            firebase_update_full_state();
+            // Sync full device state to Firebase conditionally to save quota
+            TickType_t now = xTaskGetTickCount();
+            bool time_passed = (now - last_sync_time) > pdMS_TO_TICKS(300000); // 5 mins
+            bool temp_changed = (temp - last_sync_temp > 0.5f) || (last_sync_temp - temp > 0.5f);
+            bool hum_changed = (hum - last_sync_hum > 2.0f) || (last_sync_hum - hum > 2.0f);
+
+            if (time_passed || temp_changed || hum_changed) {
+                firebase_update_full_state();
+                last_sync_temp = temp;
+                last_sync_hum = hum;
+                last_sync_time = now;
+            }
 
         } else if (err == ESP_ERR_INVALID_CRC) {
             ESP_LOGW(TAG, "\033[1;33m[DHT22]\033[0m Checksum error — retrying next cycle");
