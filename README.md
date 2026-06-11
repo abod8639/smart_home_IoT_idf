@@ -42,21 +42,21 @@ A comprehensive smart home device firmware built using the official Espressif Io
 ```mermaid
 flowchart LR
     %% Main Components
-    App((📱 Mobile App))
+    App((Mobile App))
     
-    subgraph Cloud [☁️ Cloud Backend]
+    subgraph Cloud [Cloud Backend]
         MQTT{HiveMQ Broker}
         DB[(Firebase DB)]
     end
     
-    ESP[⚙️ ESP32 Firmware]
+    ESP[ESP32 Firmware]
     
-    subgraph Devices [🔌 Home Devices]
+    subgraph Devices [Home Devices]
         direction TB
-        Relays[⚡ Smart Relays]
-        Lights[💡 RGB Lights]
-        Sensor[🌡️ Climate Sensor]
-        IR[📡 IR Blaster]
+        Relays[Smart Relays]
+        Lights[RGB Lights]
+        Sensor[Climate Sensor]
+        IR[IR Blaster]
     end
 
     %% Connections
