@@ -6,6 +6,7 @@
 #include "ir_manager.h"
 #include "ota_manager.h"
 #include "mqtt_manager.h"
+#include "ac_timer_manager.h"
 #include "esp_log.h"
 #include <string.h>
 #include <stdlib.h>
@@ -123,9 +124,30 @@ static esp_err_t handle_control_ac(const cJSON *json) {
              power ? "\033[1;32m[ ON ]\033[0m" : "\033[1;31m[ OFF ]\033[0m", tgt);
 
     if (target_temp) nvs_save_target_temp(tgt);
-    if (is_on) gpio_set_relay_state(RELAY_3_PIN, power ? 1 : 0);
+    if (is_on) {
+        gpio_set_relay_state(RELAY_3_PIN, power ? 1 : 0);
+        if (!power) {
+            ac_timer_cancel();
+        }
+    }
 
     publish_ac_event(power, tgt);
+    firebase_trigger_update();
+    return ESP_OK;
+}
+
+static esp_err_t handle_set_ac_timer(const cJSON *json) {
+    cJSON *seconds = cJSON_GetObjectItem(json, "seconds");
+    cJSON *ir_code = cJSON_GetObjectItem(json, "ir_code");
+    
+    if (!seconds) {
+        ESP_LOGW(TAG, "set_ac_timer: missing 'seconds'");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    int secs = seconds->valueint;
+    ac_timer_set(secs, ir_code);
+    
     firebase_trigger_update();
     return ESP_OK;
 }
@@ -245,6 +267,7 @@ esp_err_t command_dispatcher_execute(const cJSON *json) {
     if (strcmp(act, "set_relay")   == 0) return handle_set_relay(json);
     if (strcmp(act, "set_pwm")     == 0) return handle_set_pwm(json);
     if (strcmp(act, "control_ac")  == 0) return handle_control_ac(json);
+    if (strcmp(act, "set_ac_timer")== 0) return handle_set_ac_timer(json);
     if (strcmp(act, "ir_send")     == 0) return handle_ir_send(json);
     if (strcmp(act, "send_ir")     == 0) return handle_ir_send(json);  // Firebase alias
     if (strcmp(act, "ir_learn")    == 0) return handle_ir_learn();
