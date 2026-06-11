@@ -223,9 +223,8 @@ static void firebase_poll_task(void *pvParameters) {
                     esp_err_t cmd_err = command_dispatcher_execute(json);
 
                     if (cmd_err == ESP_OK) {
-                        // Command executed — clear it and push updated state
+                        // Command executed — clear it (state update is deferred via EventGroup)
                         firebase_http_request("commands", "DELETE", NULL, NULL);
-                        firebase_update_full_state();
                     } else {
                         ESP_LOGW(TAG, "Firebase command rejected: %s", esp_err_to_name(cmd_err));
                         // Still delete the malformed command to avoid infinite retry
