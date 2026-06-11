@@ -114,7 +114,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             break;
         case MQTT_EVENT_DATA:
             ESP_LOGD(TAG, "MQTT_EVENT_DATA");
-            if (strncmp(event->topic, MQTT_TOPIC_CMD, event->topic_len) == 0) {
+            if (event->topic_len == strlen(MQTT_TOPIC_CMD) &&
+                strncmp(event->topic, MQTT_TOPIC_CMD, event->topic_len) == 0) {
                 handle_mqtt_command(event->data, event->data_len);
             }
             break;
