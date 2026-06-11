@@ -7,6 +7,7 @@
 #include "wifi_manager.h"
 #include "esp_system.h"
 #include "cJSON.h"
+#include "ac_timer_manager.h"
 
 cJSON *state_builder_create_full(void) {
     cJSON *root = cJSON_CreateObject();
@@ -15,6 +16,7 @@ cJSON *state_builder_create_full(void) {
     cJSON_AddNumberToObject(root, "temperature",       dht_sensor_get_temperature());
     cJSON_AddNumberToObject(root, "humidity",           dht_sensor_get_humidity());
     cJSON_AddNumberToObject(root, "target_temperature", nvs_get_target_temp(24));
+    cJSON_AddNumberToObject(root, "ac_timer_remaining", ac_timer_get_remaining());
     cJSON_AddNumberToObject(root, "wifi_rssi",          wifi_manager_get_rssi());
     cJSON_AddNumberToObject(root, "heap_free",          (double)esp_get_free_heap_size());
 
