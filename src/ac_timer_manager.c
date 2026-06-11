@@ -114,7 +114,7 @@ void ac_timer_cancel(void) {
 
 int ac_timer_get_remaining(void) {
     int rem = 0;
-    if (s_timer_mutex && xSemaphoreTake(s_timer_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+    if (s_timer_mutex && xSemaphoreTake(s_timer_mutex, portMAX_DELAY) == pdTRUE) {
         rem = timer_remaining;
         xSemaphoreGive(s_timer_mutex);
     }
