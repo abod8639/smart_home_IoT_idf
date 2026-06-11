@@ -75,6 +75,13 @@ static inline int gpio_pin_to_endpoint(int pin) {
     return 0; // unknown
 }
 
+// ---------------------------------------------------------------------------
+// Security Configuration
+// ---------------------------------------------------------------------------
+// Restricts OTA updates to URLs starting with this prefix. Leave empty ("")
+// to allow any HTTPS URL during development/testing.
+#define OTA_TRUSTED_URL_PREFIX ""
+
 /** @brief Return the endpoint ID for a PWM pin (5 = lamp, 6 = RGB). */
 static inline int pwm_pin_to_endpoint(int pin) {
     if (pin == PWM_LAMP_PIN) return 5;
