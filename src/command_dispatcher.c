@@ -198,7 +198,7 @@ static esp_err_t handle_ir_send(const cJSON *json) {
         // Handle standard protocols (NEC, SAMSUNG, SONY)
         uint32_t data = (uint32_t)strtoul(value->valuestring, NULL, 16);
         int count = bits ? bits->valueint : 32;
-        if (count <= 0 || count > 64) count = 32;
+        if (count <= 0 || count > 32) count = 32;
         
         int frequency = 38000;
         size_t max_items = (count * 2) + 4;
@@ -256,6 +256,21 @@ static esp_err_t handle_ota_start(const cJSON *json) {
         ESP_LOGW(TAG, "ota_start: missing or empty URL");
         return ESP_ERR_INVALID_ARG;
     }
+
+    // Verify HTTPS protocol
+    if (strncmp(url->valuestring, "https://", 8) != 0) {
+        ESP_LOGE(TAG, "ota_start: insecure URL rejected (must be https://)");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+#ifdef OTA_TRUSTED_URL_PREFIX
+    if (strlen(OTA_TRUSTED_URL_PREFIX) > 0 &&
+        strncmp(url->valuestring, OTA_TRUSTED_URL_PREFIX, strlen(OTA_TRUSTED_URL_PREFIX)) != 0) {
+        ESP_LOGE(TAG, "ota_start: URL does not match trusted prefix '%s'", OTA_TRUSTED_URL_PREFIX);
+        return ESP_ERR_INVALID_ARG;
+    }
+#endif
+
     ESP_LOGI(TAG, "\033[1;33mOTA Start\033[0m ➔ %s", url->valuestring);
     ota_manager_start(url->valuestring);
     return ESP_OK;
