@@ -121,7 +121,7 @@ static esp_err_t handle_control_ac(const cJSON *json) {
     if (tgt < 16) tgt = 16;
     if (tgt > 30) tgt = 30;
 
-    bool power = (is_on && is_on->valueint);
+    bool power = (is_on && (cJSON_IsTrue(is_on) || (cJSON_IsNumber(is_on) && is_on->valueint != 0)));
 
     ESP_LOGI(TAG, "\033[1;36mControl AC\033[0m ➔ Power: %s, Temp: \033[1;36m%d°C\033[0m",
              power ? "\033[1;32m[ ON ]\033[0m" : "\033[1;31m[ OFF ]\033[0m", tgt);
