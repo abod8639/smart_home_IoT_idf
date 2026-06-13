@@ -7,3 +7,4 @@ Kconfig.projbuild
 src/wifi_credentials.h
 .gitignore
 src/mqtt_credentials.h
+*.gcov
