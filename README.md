@@ -1,8 +1,25 @@
 # ESP32 Smart Home IoT Firmware
 
-A comprehensive smart home device firmware built using the official Espressif IoT Development Framework (ESP-IDF v5.5.4) for the ESP32 platform. This system facilitates real-time control of GPIO relays, PWM-based dimmer and RGB lighting, Infrared (IR) learn/transmit capabilities, and DHT22 climate sensor monitoring. It incorporates multi-protocol synchronization for high responsiveness and robust fault tolerance.
+<p align="center">
+  <a href="https://github.com/abod8639/smart_home_IoT_idf/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/abod8639/smart_home_IoT_idf/ci.yml?branch=main&style=flat-square&logo=github-actions&logoColor=white&label=Build" alt="Build Status">
+  </a>
+  <a href="https://codecov.io/gh/abod8639/smart_home_IoT_idf">
+    <img src="https://codecov.io/gh/abod8639/smart_home_IoT_idf/graph/badge.svg?token=4KIEJEXMSP" alt="Codecov">
+  </a>
+  <img src="https://img.shields.io/badge/PlatformIO-Supported-orange.svg?style=flat-square&logo=platformio&logoColor=white" alt="PlatformIO">
+  <img src="https://img.shields.io/badge/Framework-ESP--IDF%20v5.5.4-blue.svg?style=flat-square&logo=espressif&logoColor=white" alt="ESP-IDF">
+  <img src="https://img.shields.io/badge/Language-C%2F%2B%2B-00599C.svg?style=flat-square&logo=c%2B%2B&logoColor=white" alt="Language">
+</p>
 
-[![codecov](https://codecov.io/gh/abod8639/smart_home_IoT_idf/graph/badge.svg?token=4KIEJEXMSP)](https://codecov.io/gh/abod8639/smart_home_IoT_idf)
+<p align="center">
+  <img src="https://img.shields.io/badge/Protocol-MQTT-3C5280.svg?style=flat-square&logo=mqtt&logoColor=white" alt="MQTT">
+  <img src="https://img.shields.io/badge/Standard-Matter-00A9E0.svg?style=flat-square&logo=matter&logoColor=white" alt="Matter">
+  <img src="https://img.shields.io/badge/OS-FreeRTOS-00A3E0.svg?style=flat-square&logo=freertos&logoColor=white" alt="FreeRTOS">
+  <img src="https://img.shields.io/badge/Database-Firebase-FFCA28.svg?style=flat-square&logo=firebase&logoColor=black" alt="Firebase">
+</p>
+
+A comprehensive smart home device firmware built using the official Espressif IoT Development Framework (ESP-IDF v5.5.4) for the ESP32 platform. This system facilitates real-time control of GPIO relays, PWM-based dimmer and RGB lighting, Infrared (IR) learn/transmit capabilities, and DHT22 climate sensor monitoring. It incorporates multi-protocol synchronization for high responsiveness and robust fault tolerance.
 
 ---
 
