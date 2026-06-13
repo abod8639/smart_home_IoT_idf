@@ -357,6 +357,100 @@ void test_ota_start_insecure_url(void) {
     cJSON_Delete(json);
 }
 
+// 19. Test set_pwm missing params
+void test_set_pwm_missing_params(void) {
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "action", "set_pwm");
+    cJSON_AddNumberToObject(json, "pin", PWM_LAMP_PIN);
+    
+    esp_err_t err = command_dispatcher_execute(json);
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, err);
+    cJSON_Delete(json);
+}
+
+// 20. Test set_ac_timer missing params
+void test_set_ac_timer_missing_params(void) {
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "action", "set_ac_timer");
+    
+    esp_err_t err = command_dispatcher_execute(json);
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, err);
+    cJSON_Delete(json);
+}
+
+// 21. Test ir_send missing params
+void test_ir_send_missing_params(void) {
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "action", "ir_send");
+    
+    esp_err_t err = command_dispatcher_execute(json);
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, err);
+    cJSON_Delete(json);
+}
+
+// 22. Test ir_send SONY protocol
+void test_ir_send_sony(void) {
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "action", "ir_send");
+    cJSON_AddStringToObject(json, "protocol", "SONY");
+    cJSON_AddStringToObject(json, "value", "A5"); 
+    cJSON_AddNumberToObject(json, "bits", 8);
+    
+    esp_err_t err = command_dispatcher_execute(json);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+    
+    TEST_ASSERT_EQUAL(1, mock_status.ir.send_raw_call_count);
+    TEST_ASSERT_EQUAL(40000, mock_status.ir.last_frequency);
+    TEST_ASSERT_EQUAL(17, mock_status.ir.last_count); // 2 header + 8 bits + 7 separators = 17
+    TEST_ASSERT_EQUAL(2400, mock_status.ir.last_durations[0]);
+    TEST_ASSERT_EQUAL(600, mock_status.ir.last_durations[1]);
+    
+    cJSON_Delete(json);
+}
+
+// 25. Test ir_send SAMSUNG protocol
+void test_ir_send_samsung(void) {
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "action", "ir_send");
+    cJSON_AddStringToObject(json, "protocol", "SAMSUNG");
+    cJSON_AddStringToObject(json, "value", "A5"); 
+    cJSON_AddNumberToObject(json, "bits", 8);
+    
+    esp_err_t err = command_dispatcher_execute(json);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+    
+    TEST_ASSERT_EQUAL(1, mock_status.ir.send_raw_call_count);
+    TEST_ASSERT_EQUAL(38000, mock_status.ir.last_frequency);
+    TEST_ASSERT_EQUAL(19, mock_status.ir.last_count); // 2 header + 8*2 bits + 1 footer = 19
+    TEST_ASSERT_EQUAL(4500, mock_status.ir.last_durations[0]);
+    TEST_ASSERT_EQUAL(4500, mock_status.ir.last_durations[1]);
+    TEST_ASSERT_EQUAL(560, mock_status.ir.last_durations[2]); // First bit duration
+    
+    cJSON_Delete(json);
+}
+
+// 23. Test ir_learn
+void test_ir_learn_success(void) {
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "action", "ir_learn");
+    
+    esp_err_t err = command_dispatcher_execute(json);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+    
+    TEST_ASSERT_EQUAL(1, mock_status.ir.start_learning_call_count);
+    cJSON_Delete(json);
+}
+
+// 24. Test ota_start missing url
+void test_ota_start_missing_url(void) {
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "action", "ota_start");
+    
+    esp_err_t err = command_dispatcher_execute(json);
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, err);
+    cJSON_Delete(json);
+}
+
 int main(void) {
     UNITY_BEGIN();
     
@@ -373,6 +467,7 @@ int main(void) {
     RUN_TEST(test_set_pwm_clamping_low);
     RUN_TEST(test_set_pwm_clamping_high);
     RUN_TEST(test_set_pwm_invalid_pin);
+    RUN_TEST(test_set_pwm_missing_params);
     
     RUN_TEST(test_control_ac_success_on);
     RUN_TEST(test_control_ac_power_off_cancels_timer);
@@ -380,13 +475,19 @@ int main(void) {
     RUN_TEST(test_control_ac_temp_clamping_high);
     
     RUN_TEST(test_set_ac_timer_success);
+    RUN_TEST(test_set_ac_timer_missing_params);
     
     RUN_TEST(test_ir_send_raw);
     RUN_TEST(test_ir_send_nec);
+    RUN_TEST(test_ir_send_sony);
+    RUN_TEST(test_ir_send_samsung);
     RUN_TEST(test_ir_send_unsupported);
+    RUN_TEST(test_ir_send_missing_params);
+    RUN_TEST(test_ir_learn_success);
     
     RUN_TEST(test_ota_start_success);
     RUN_TEST(test_ota_start_insecure_url);
+    RUN_TEST(test_ota_start_missing_url);
     
     return UNITY_END();
 }
