@@ -10,6 +10,7 @@ extern "C" {
 #include "dht_sensor.h"
 #include "firebase_manager.h"
 #include "gpio_manager.h"
+#include "button_manager.h"
 #include "ir_manager.h"
 #include "mdns_manager.h"
 #include "mqtt_manager.h"
@@ -124,6 +125,9 @@ extern "C" void app_main() {
     
     ESP_LOGI(TAG, "\033[1;32m[SERVICES]\033[0m Initializing AC Timer...");
     ac_timer_manager_init();
+
+    ESP_LOGI(TAG, "\033[1;33m[HARDWARE]\033[0m Initializing Button Manager...");
+    button_manager_init();
 
     // 3. Network — starts WiFi and creates g_wifi_event_group
     ESP_LOGI(TAG, "\033[1;34m[NETWORK]\033[0m Initializing Wi-Fi Manager...");
