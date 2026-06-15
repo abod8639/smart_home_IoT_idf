@@ -24,4 +24,9 @@ void wifi_manager_init(void);
  */
 int wifi_manager_get_rssi(void);
 
+/**
+ * @brief Start the Access Point and Captive Portal for Wi-Fi provisioning.
+ */
+void wifi_manager_start_captive_portal(void);
+
 #endif // WIFI_MANAGER_H
