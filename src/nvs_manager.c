@@ -59,3 +59,19 @@ int nvs_get_target_temp(int default_val) {
     nvs_get_i32(s_nvs_handle, "target_temp", &value);
     return value;
 }
+
+void nvs_save_wifi_credentials(const char* ssid, const char* password) {
+    if (!s_handle_open) return;
+    nvs_set_str(s_nvs_handle, "wifi_ssid", ssid);
+    nvs_set_str(s_nvs_handle, "wifi_pass", password);
+    nvs_commit(s_nvs_handle);
+}
+
+bool nvs_get_wifi_credentials(char* ssid, size_t ssid_len, char* password, size_t password_len) {
+    if (!s_handle_open) return false;
+    
+    esp_err_t err_ssid = nvs_get_str(s_nvs_handle, "wifi_ssid", ssid, &ssid_len);
+    esp_err_t err_pass = nvs_get_str(s_nvs_handle, "wifi_pass", password, &password_len);
+    
+    return (err_ssid == ESP_OK && err_pass == ESP_OK);
+}
