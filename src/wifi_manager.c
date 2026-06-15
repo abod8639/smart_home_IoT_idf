@@ -1,5 +1,4 @@
 #include "wifi_manager.h"
-#include "wifi_credentials.h"  // gitignored — edit WIFI_SSID / WIFI_PASSWORD there
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_netif.h"
@@ -7,6 +6,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/timers.h"
+#include "nvs_manager.h"
+#include "captive_portal.h"
 #include <string.h>
 
 static const char *TAG = "WIFI_MANAGER";
@@ -80,18 +81,52 @@ void wifi_manager_init(void) {
                                                         NULL,
                                                         &instance_got_ip));
 
-    // Credentials are defined in src/wifi_credentials.h (gitignored).
-    // Edit that file to set your SSID/password — it is never committed.
-    wifi_config_t wifi_config = {
-        .sta = {
-            .ssid     = WIFI_SSID,
-            .password = WIFI_PASSWORD,
+    // Try to load credentials from NVS
+    char ssid[32] = {0};
+    char pass[64] = {0};
+    
+    if (nvs_get_wifi_credentials(ssid, sizeof(ssid), pass, sizeof(pass)) && strlen(ssid) > 0) {
+        ESP_LOGI(TAG, "Loaded WiFi credentials from NVS. Connecting to %s...", ssid);
+        
+        wifi_config_t wifi_config = {0};
+        strncpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
+        strncpy((char *)wifi_config.sta.password, pass, sizeof(wifi_config.sta.password));
+        
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+        ESP_ERROR_CHECK(esp_wifi_start());
+    } else {
+        ESP_LOGW(TAG, "No WiFi credentials found in NVS. Starting Captive Portal...");
+        wifi_manager_start_captive_portal();
+    }
+}
+
+void wifi_manager_start_captive_portal(void) {
+    ESP_LOGI(TAG, "Starting Wi-Fi Access Point (SmartHome-Setup)");
+    
+    // Create AP netif if not exists
+    esp_netif_create_default_wifi_ap();
+    
+    // Stop WiFi if it was already running in STA mode
+    esp_wifi_stop();
+    
+    wifi_config_t ap_config = {
+        .ap = {
+            .ssid = "SmartHome-Setup",
+            .ssid_len = strlen("SmartHome-Setup"),
+            .channel = 1,
+            .password = "", // Open network
+            .max_connection = 4,
+            .authmode = WIFI_AUTH_OPEN
         },
     };
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA)); // APSTA to allow scanning while broadcasting
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
     ESP_ERROR_CHECK(esp_wifi_start());
+    
+    // Start the Captive Portal HTTP Server and DNS Server
+    captive_portal_start();
 }
 
 int wifi_manager_get_rssi(void) {
