@@ -59,6 +59,13 @@ typedef struct {
     } firebase;
 
     struct {
+        int add_endpoint_call_count;
+        int last_device_type;
+        int last_pin;
+        int add_endpoint_return_val;
+    } matter;
+
+    struct {
         int get_rssi_return_val;
     } wifi;
 
