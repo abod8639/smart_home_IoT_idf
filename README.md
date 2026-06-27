@@ -43,25 +43,17 @@
 
 ```mermaid
 flowchart LR
-    subgraph UI ["📱 Controllers"]
         FA[Flutter App]
         Voice[Smart Home Speakers\nGoogle / Apple / Alexa]
-    end
 
-    subgraph Net ["🌐 Network & Cloud"]
         MQ[MQTT Broker\nLocal LAN]
         FB[(Firebase RTDB\nCloud Database)]
-    end
 
-    subgraph ESP32 ["⚡ ESP32 Controller"]
         ESP[ESP32 Smart Firmware]
-    end
 
-    subgraph HW ["🔌 Hardware Devices"]
         Relays[🎛️ 4x Relays\nAppliances]
         Lights[💡 Lights\nPWM & RGB]
         AC[❄️ AC Controller\nIR & Timer]
-    end
 
     %% Connections
     FA <-->|MQTT pub/sub| MQ
