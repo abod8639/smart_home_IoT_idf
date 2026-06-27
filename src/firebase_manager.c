@@ -212,6 +212,26 @@ static void firebase_poll_task(void *pvParameters) {
   ESP_LOGI(TAG, "Firebase poll task started");
   firebase_update_status("online");
 
+  // ── KEY FIX ──────────────────────────────────────────────────────────────
+  // Wait for the Matter stack to finish starting before reading the Setup
+  // Payload.  matter_manager_init() sets MATTER_READY_BIT after a short
+  // stabilisation delay once esp_matter::start() returns.
+  // We give it up to 30 seconds; if Matter is disabled the stub sets the bit
+  // immediately so this never blocks.
+  // ─────────────────────────────────────────────────────────────────────────
+  ESP_LOGI(TAG, "Waiting for Matter stack to be ready...");
+  EventBits_t matter_bits = xEventGroupWaitBits(
+      g_wifi_event_group, MATTER_READY_BIT,
+      pdFALSE,   // do not clear the bit
+      pdTRUE,
+      pdMS_TO_TICKS(30000));
+
+  if (matter_bits & MATTER_READY_BIT) {
+    ESP_LOGI(TAG, "Matter ready — reading Setup Payload");
+  } else {
+    ESP_LOGW(TAG, "Matter ready timeout (30 s) — reading Setup Payload anyway");
+  }
+
   // Fetch and send Matter Setup Payload
   char qr_buf[256];
   char manual_buf[32];
@@ -224,7 +244,9 @@ static void firebase_poll_task(void *pvParameters) {
         "{\"matter_payload\": {\"qr_code\": \"%s\", \"manual_code\": \"%s\"}}",
         qr_buf, manual_buf);
     firebase_http_request("", "PATCH", payload, NULL);
+    ESP_LOGI(TAG, "Matter payload sent to Firebase (QR: %.40s...)", qr_buf);
   }
+
 
   while (1) {
     // Check the deferred-update flag (thread-safe via event group).
