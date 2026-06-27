@@ -1,6 +1,6 @@
 #include "state_builder.h"
 #include "device_config.h"
-#include "dht_sensor.h"
+// #include "dht_sensor.h"
 #include "gpio_manager.h"
 #include "pwm_manager.h"
 #include "nvs_manager.h"
@@ -13,8 +13,9 @@ cJSON *state_builder_create_full(void) {
     cJSON *root = cJSON_CreateObject();
     if (!root) return NULL;
 
-    cJSON_AddNumberToObject(root, "temperature",       dht_sensor_get_temperature());
-    cJSON_AddNumberToObject(root, "humidity",           dht_sensor_get_humidity());
+    // cJSON_AddNumberToObject(root, "temperature",
+    // dht_sensor_get_temperature());
+    // cJSON_AddNumberToObject(root, "humidity", dht_sensor_get_humidity());
     cJSON_AddNumberToObject(root, "target_temperature", nvs_get_target_temp(24));
     cJSON_AddNumberToObject(root, "ac_timer_remaining", ac_timer_get_remaining());
     cJSON_AddNumberToObject(root, "wifi_rssi",          wifi_manager_get_rssi());
