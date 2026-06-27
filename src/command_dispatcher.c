@@ -290,14 +290,15 @@ static esp_err_t handle_add_device(const cJSON *json) {
     int pin_num = pin->valueint;
 
     ESP_LOGI(TAG, "\033[1;34mAdd Device\033[0m ➔ Type %d on Pin %d", device_type, pin_num);
-    
+
+    // matter_manager_add_endpoint() creates the endpoint AND persists it to
+    // NVS so it is restored automatically on the next boot (before start()).
     int endpoint_id = matter_manager_add_endpoint(device_type, pin_num);
     if (endpoint_id >= 0) {
-        // Optionally store the mapping in NVS for persistence across reboots.
-        // nvs_manager_save_device(device_type, pin_num, endpoint_id);
-        
         char buf[128];
-        snprintf(buf, sizeof(buf), "{\"event\":\"device_added\",\"endpoint\":%d,\"type\":%d,\"pin\":%d}", endpoint_id, device_type, pin_num);
+        snprintf(buf, sizeof(buf),
+                 "{\"event\":\"device_added\",\"endpoint\":%d,\"type\":%d,\"pin\":%d}",
+                 endpoint_id, device_type, pin_num);
         mqtt_manager_publish_event(buf);
         firebase_trigger_update();
         return ESP_OK;
