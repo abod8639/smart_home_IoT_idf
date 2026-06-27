@@ -144,3 +144,26 @@ uint32_t esp_get_free_heap_size(void) {
 void firebase_trigger_update(void) {
     mock_status.firebase.trigger_update_call_count++;
 }
+
+// Matter Manager Mocks
+void matter_manager_init(void) {
+    // Stub
+}
+
+int matter_manager_add_endpoint(int device_type, int pin) {
+    mock_status.matter.add_endpoint_call_count++;
+    mock_status.matter.last_device_type = device_type;
+    mock_status.matter.last_pin = pin;
+    return mock_status.matter.add_endpoint_return_val;
+}
+
+void matter_manager_get_setup_payload(char *qr_buf, size_t qr_size, char *manual_buf, size_t manual_size) {
+    if (qr_buf && qr_size > 0) {
+        strncpy(qr_buf, "MT:DummyQRCodePayloadForTesting", qr_size - 1);
+        qr_buf[qr_size - 1] = '\0';
+    }
+    if (manual_buf && manual_size > 0) {
+        strncpy(manual_buf, "12345678901", manual_size - 1);
+        manual_buf[manual_size - 1] = '\0';
+    }
+}
