@@ -75,3 +75,79 @@ bool nvs_get_wifi_credentials(char* ssid, size_t ssid_len, char* password, size_
     
     return (err_ssid == ESP_OK && err_pass == ESP_OK);
 }
+
+// ---------------------------------------------------------------------------
+// Matter Endpoint Persistence
+// Key scheme (max 15 chars):
+//   "mt_cnt"       → int32  total saved device count
+//   "mt%d_t" % n  → int32  device_type for slot n
+//   "mt%d_p" % n  → int32  pin_num     for slot n
+// ---------------------------------------------------------------------------
+
+void nvs_save_matter_device(int slot, int device_type, int pin_num) {
+    if (!s_handle_open || slot < 0 || slot >= NVS_MAX_MATTER_DEVICES) return;
+
+    char key_t[12], key_p[12];
+    snprintf(key_t, sizeof(key_t), "mt%d_t", slot);
+    snprintf(key_p, sizeof(key_p), "mt%d_p", slot);
+
+    nvs_set_i32(s_nvs_handle, key_t, (int32_t)device_type);
+    nvs_set_i32(s_nvs_handle, key_p, (int32_t)pin_num);
+    nvs_commit(s_nvs_handle);
+
+    ESP_LOGI(TAG, "Matter device saved: slot=%d type=%d pin=%d", slot, device_type, pin_num);
+}
+
+bool nvs_get_matter_device(int slot, int *device_type, int *pin_num) {
+    if (!s_handle_open || slot < 0 || slot >= NVS_MAX_MATTER_DEVICES) return false;
+
+    char key_t[12], key_p[12];
+    snprintf(key_t, sizeof(key_t), "mt%d_t", slot);
+    snprintf(key_p, sizeof(key_p), "mt%d_p", slot);
+
+    int32_t dt = 0, pn = 0;
+    esp_err_t err_t = nvs_get_i32(s_nvs_handle, key_t, &dt);
+    esp_err_t err_p = nvs_get_i32(s_nvs_handle, key_p, &pn);
+
+    if (err_t == ESP_OK && err_p == ESP_OK) {
+        *device_type = (int)dt;
+        *pin_num     = (int)pn;
+        return true;
+    }
+    return false;
+}
+
+int nvs_get_matter_device_count(void) {
+    if (!s_handle_open) return 0;
+    int32_t count = 0;
+    nvs_get_i32(s_nvs_handle, "mt_cnt", &count);
+    return (int)count;
+}
+
+void nvs_increment_matter_device_count(void) {
+    if (!s_handle_open) return;
+    int32_t count = 0;
+    nvs_get_i32(s_nvs_handle, "mt_cnt", &count);
+    count++;
+    nvs_set_i32(s_nvs_handle, "mt_cnt", count);
+    nvs_commit(s_nvs_handle);
+}
+
+void nvs_clear_matter_devices(void) {
+    if (!s_handle_open) return;
+    int32_t count = 0;
+    nvs_get_i32(s_nvs_handle, "mt_cnt", &count);
+
+    for (int i = 0; i < count && i < NVS_MAX_MATTER_DEVICES; i++) {
+        char key_t[12], key_p[12];
+        snprintf(key_t, sizeof(key_t), "mt%d_t", i);
+        snprintf(key_p, sizeof(key_p), "mt%d_p", i);
+        nvs_erase_key(s_nvs_handle, key_t);
+        nvs_erase_key(s_nvs_handle, key_p);
+    }
+    nvs_erase_key(s_nvs_handle, "mt_cnt");
+    nvs_commit(s_nvs_handle);
+
+    ESP_LOGI(TAG, "All Matter devices cleared from NVS");
+}
+
