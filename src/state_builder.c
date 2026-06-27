@@ -27,10 +27,27 @@ cJSON *state_builder_create_full(void) {
         cJSON_AddNumberToObject(pins, "relay_2",   gpio_get_relay_state(RELAY_2_PIN));
         cJSON_AddNumberToObject(pins, "relay_3",   gpio_get_relay_state(RELAY_3_PIN));
         cJSON_AddNumberToObject(pins, "relay_4",   gpio_get_relay_state(RELAY_4_PIN));
+        cJSON_AddNumberToObject(pins, "relay_5",   gpio_get_relay_state(RELAY_5_PIN));
+        cJSON_AddNumberToObject(pins, "relay_6",   gpio_get_relay_state(RELAY_6_PIN));
+        cJSON_AddNumberToObject(pins, "relay_7",   gpio_get_relay_state(RELAY_7_PIN));
+        cJSON_AddNumberToObject(pins, "relay_8",   gpio_get_relay_state(RELAY_8_PIN));
+        cJSON_AddNumberToObject(pins, "relay_9",   gpio_get_relay_state(RELAY_9_PIN));
+        cJSON_AddNumberToObject(pins, "relay_10",  gpio_get_relay_state(RELAY_10_PIN));
+        cJSON_AddNumberToObject(pins, "relay_11",  gpio_get_relay_state(RELAY_11_PIN));
+        cJSON_AddNumberToObject(pins, "relay_12",  gpio_get_relay_state(RELAY_12_PIN));
+
         cJSON_AddNumberToObject(pins, "pwm_lamp",  pwm_get_duty(PWM_LAMP_PIN));
         cJSON_AddNumberToObject(pins, "pwm_rgb_r", pwm_get_duty(PWM_RGB_R_PIN));
         cJSON_AddNumberToObject(pins, "pwm_rgb_g", pwm_get_duty(PWM_RGB_G_PIN));
         cJSON_AddNumberToObject(pins, "pwm_rgb_b", pwm_get_duty(PWM_RGB_B_PIN));
+        cJSON_AddNumberToObject(pins, "pwm_5",     pwm_get_duty(PWM_5_PIN));
+        cJSON_AddNumberToObject(pins, "pwm_6",     pwm_get_duty(PWM_6_PIN));
+        cJSON_AddNumberToObject(pins, "pwm_7",     pwm_get_duty(PWM_7_PIN));
+        cJSON_AddNumberToObject(pins, "pwm_8",     pwm_get_duty(PWM_8_PIN));
+        cJSON_AddNumberToObject(pins, "pwm_9",     pwm_get_duty(PWM_9_PIN));
+        cJSON_AddNumberToObject(pins, "pwm_10",    pwm_get_duty(PWM_10_PIN));
+        cJSON_AddNumberToObject(pins, "pwm_11",    pwm_get_duty(PWM_11_PIN));
+        cJSON_AddNumberToObject(pins, "pwm_12",    pwm_get_duty(PWM_12_PIN));
         cJSON_AddItemToObject(root, "pins", pins);
     }
 
