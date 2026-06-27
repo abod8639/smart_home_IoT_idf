@@ -27,6 +27,14 @@
 #define RELAY_2_PIN  18
 #define RELAY_3_PIN  19
 #define RELAY_4_PIN  21
+#define RELAY_5_PIN   5
+#define RELAY_6_PIN  12
+#define RELAY_7_PIN  13
+#define RELAY_8_PIN  14
+#define RELAY_9_PIN  15
+#define RELAY_10_PIN 16
+#define RELAY_11_PIN 17
+#define RELAY_12_PIN 27
 
 // ---------------------------------------------------------------------------
 // GPIO — PWM Pins (LEDC)
@@ -35,6 +43,14 @@
 #define PWM_RGB_R_PIN  23
 #define PWM_RGB_G_PIN  25
 #define PWM_RGB_B_PIN  26
+#define PWM_5_PIN      5
+#define PWM_6_PIN     12
+#define PWM_7_PIN     13
+#define PWM_8_PIN     14
+#define PWM_9_PIN     15
+#define PWM_10_PIN    16
+#define PWM_11_PIN    17
+#define PWM_12_PIN    27
 
 // ---------------------------------------------------------------------------
 // GPIO — IR Pins (RMT)
@@ -52,16 +68,24 @@
 // Used by the command dispatcher to reject invalid pin numbers.
 // ---------------------------------------------------------------------------
 
-/** @brief Return true if `pin` is one of the four relay GPIOs. */
+/** @brief Return true if `pin` is one of the relay GPIOs. */
 static inline bool is_valid_relay_pin(int pin) {
     return pin == RELAY_1_PIN  || pin == RELAY_2_PIN ||
-           pin == RELAY_3_PIN  || pin == RELAY_4_PIN;
+           pin == RELAY_3_PIN  || pin == RELAY_4_PIN ||
+           pin == RELAY_5_PIN  || pin == RELAY_6_PIN ||
+           pin == RELAY_7_PIN  || pin == RELAY_8_PIN ||
+           pin == RELAY_9_PIN  || pin == RELAY_10_PIN ||
+           pin == RELAY_11_PIN || pin == RELAY_12_PIN;
 }
 
-/** @brief Return true if `pin` is a PWM-capable GPIO (lamp or RGB). */
+/** @brief Return true if `pin` is a PWM-capable GPIO. */
 static inline bool is_valid_pwm_pin(int pin) {
     return pin == PWM_LAMP_PIN  || pin == PWM_RGB_R_PIN ||
-           pin == PWM_RGB_G_PIN || pin == PWM_RGB_B_PIN;
+           pin == PWM_RGB_G_PIN || pin == PWM_RGB_B_PIN ||
+           pin == PWM_5_PIN     || pin == PWM_6_PIN     ||
+           pin == PWM_7_PIN     || pin == PWM_8_PIN     ||
+           pin == PWM_9_PIN     || pin == PWM_10_PIN    ||
+           pin == PWM_11_PIN    || pin == PWM_12_PIN;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +96,14 @@ static inline int gpio_pin_to_endpoint(int pin) {
     if (pin == RELAY_2_PIN) return 2;
     if (pin == RELAY_3_PIN) return 3;
     if (pin == RELAY_4_PIN) return 4;
+    if (pin == RELAY_5_PIN) return 7;
+    if (pin == RELAY_6_PIN) return 8;
+    if (pin == RELAY_7_PIN) return 9;
+    if (pin == RELAY_8_PIN) return 10;
+    if (pin == RELAY_9_PIN) return 11;
+    if (pin == RELAY_10_PIN) return 12;
+    if (pin == RELAY_11_PIN) return 13;
+    if (pin == RELAY_12_PIN) return 14;
     return 0; // unknown
 }
 
@@ -82,10 +114,18 @@ static inline int gpio_pin_to_endpoint(int pin) {
 // to allow any HTTPS URL during development/testing.
 #define OTA_TRUSTED_URL_PREFIX ""
 
-/** @brief Return the endpoint ID for a PWM pin (5 = lamp, 6 = RGB). */
+/** @brief Return the endpoint ID for a PWM pin. */
 static inline int pwm_pin_to_endpoint(int pin) {
     if (pin == PWM_LAMP_PIN) return 5;
     if (pin == PWM_RGB_R_PIN || pin == PWM_RGB_G_PIN || pin == PWM_RGB_B_PIN) return 6;
+    if (pin == PWM_5_PIN) return 7;
+    if (pin == PWM_6_PIN) return 8;
+    if (pin == PWM_7_PIN) return 9;
+    if (pin == PWM_8_PIN) return 10;
+    if (pin == PWM_9_PIN) return 11;
+    if (pin == PWM_10_PIN) return 12;
+    if (pin == PWM_11_PIN) return 13;
+    if (pin == PWM_12_PIN) return 14;
     return 0;
 }
 
