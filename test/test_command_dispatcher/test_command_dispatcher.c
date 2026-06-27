@@ -451,6 +451,63 @@ void test_ota_start_missing_url(void) {
     cJSON_Delete(json);
 }
 
+// 26. Test add_device success
+void test_add_device_success(void) {
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "action", "add_device");
+    cJSON_AddNumberToObject(json, "type", 1);
+    cJSON_AddNumberToObject(json, "pin", 2);
+
+    mock_status.matter.add_endpoint_return_val = 5;
+
+    esp_err_t err = command_dispatcher_execute(json);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+
+    TEST_ASSERT_EQUAL(1, mock_status.matter.add_endpoint_call_count);
+    TEST_ASSERT_EQUAL(1, mock_status.matter.last_device_type);
+    TEST_ASSERT_EQUAL(2, mock_status.matter.last_pin);
+
+    TEST_ASSERT_EQUAL(1, mock_status.mqtt.publish_call_count);
+    TEST_ASSERT_EQUAL_STRING("{\"event\":\"device_added\",\"endpoint\":5,\"type\":1,\"pin\":2}", mock_status.mqtt.last_published_event);
+    TEST_ASSERT_EQUAL(1, mock_status.firebase.trigger_update_call_count);
+
+    cJSON_Delete(json);
+}
+
+// 27. Test add_device failure
+void test_add_device_failure(void) {
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "action", "add_device");
+    cJSON_AddNumberToObject(json, "type", 2);
+    cJSON_AddNumberToObject(json, "pin", 18);
+
+    mock_status.matter.add_endpoint_return_val = -1; // simulate failure
+
+    esp_err_t err = command_dispatcher_execute(json);
+    TEST_ASSERT_EQUAL(ESP_FAIL, err);
+
+    TEST_ASSERT_EQUAL(1, mock_status.matter.add_endpoint_call_count);
+    TEST_ASSERT_EQUAL(0, mock_status.mqtt.publish_call_count);
+    TEST_ASSERT_EQUAL(0, mock_status.firebase.trigger_update_call_count);
+
+    cJSON_Delete(json);
+}
+
+// 28. Test add_device missing params
+void test_add_device_missing_params(void) {
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "action", "add_device");
+    cJSON_AddNumberToObject(json, "type", 1);
+    // pin is missing
+
+    esp_err_t err = command_dispatcher_execute(json);
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, err);
+
+    TEST_ASSERT_EQUAL(0, mock_status.matter.add_endpoint_call_count);
+
+    cJSON_Delete(json);
+}
+
 int main(void) {
     UNITY_BEGIN();
     
@@ -488,6 +545,10 @@ int main(void) {
     RUN_TEST(test_ota_start_success);
     RUN_TEST(test_ota_start_insecure_url);
     RUN_TEST(test_ota_start_missing_url);
+
+    RUN_TEST(test_add_device_success);
+    RUN_TEST(test_add_device_failure);
+    RUN_TEST(test_add_device_missing_params);
     
     return UNITY_END();
 }
