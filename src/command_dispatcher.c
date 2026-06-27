@@ -7,6 +7,7 @@
 #include "ota_manager.h"
 #include "mqtt_manager.h"
 #include "ac_timer_manager.h"
+#include "matter_manager.h"
 #include "esp_log.h"
 #include <string.h>
 #include <stdlib.h>
@@ -276,6 +277,36 @@ static esp_err_t handle_ota_start(const cJSON *json) {
     return ESP_OK;
 }
 
+static esp_err_t handle_add_device(const cJSON *json) {
+    cJSON *type = cJSON_GetObjectItem(json, "type");
+    cJSON *pin = cJSON_GetObjectItem(json, "pin");
+
+    if (!type || !pin || !cJSON_IsNumber(type) || !cJSON_IsNumber(pin)) {
+        ESP_LOGW(TAG, "add_device: missing or invalid type/pin");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    int device_type = type->valueint;
+    int pin_num = pin->valueint;
+
+    ESP_LOGI(TAG, "\033[1;34mAdd Device\033[0m ➔ Type %d on Pin %d", device_type, pin_num);
+    
+    int endpoint_id = matter_manager_add_endpoint(device_type, pin_num);
+    if (endpoint_id >= 0) {
+        // Optionally store the mapping in NVS for persistence across reboots.
+        // nvs_manager_save_device(device_type, pin_num, endpoint_id);
+        
+        char buf[128];
+        snprintf(buf, sizeof(buf), "{\"event\":\"device_added\",\"endpoint\":%d,\"type\":%d,\"pin\":%d}", endpoint_id, device_type, pin_num);
+        mqtt_manager_publish_event(buf);
+        firebase_trigger_update();
+        return ESP_OK;
+    } else {
+        ESP_LOGE(TAG, "Failed to add Matter endpoint");
+        return ESP_FAIL;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -299,6 +330,7 @@ esp_err_t command_dispatcher_execute(const cJSON *json) {
     if (strcmp(act, "send_ir")     == 0) return handle_ir_send(json);  // Firebase alias
     if (strcmp(act, "ir_learn")    == 0) return handle_ir_learn();
     if (strcmp(act, "ota_start")   == 0) return handle_ota_start(json);
+    if (strcmp(act, "add_device")  == 0) return handle_add_device(json);
     if (strcmp(act, "get_state")   == 0) return ESP_OK;  // handled by caller
 
     ESP_LOGW(TAG, "Unknown action: '%s'", act);
