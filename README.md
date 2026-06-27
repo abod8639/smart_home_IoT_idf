@@ -1,4 +1,4 @@
-# 🏠 ESP32 Smart Home IoT Firmware
+#  ESP32 Smart Home IoT Firmware
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/abod8639/smart_home_IoT_idf/ci.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/abod8639/smart_home_IoT_idf/actions)
 [![Codecov](https://img.shields.io/codecov/c/github/abod8639/smart_home_IoT_idf?style=for-the-badge&logo=codecov)](https://codecov.io/gh/abod8639/smart_home_IoT_idf)
@@ -14,13 +14,13 @@
 
 ---
 
-## 📖 Overview
+##  Overview
 
 **ESP32 Smart Home IoT Firmware** is a production-grade, multi-protocol smart home controller built for the ESP32 microcontroller. It bridges local LAN control via **MQTT**, cloud synchronization via **Firebase Realtime Database**, and native smart home ecosystem integration via the **Matter/CHIP** protocol — all running concurrently on FreeRTOS. The firmware controls an array of hardware peripherals including GPIO relay switches, PWM-driven lamps and RGB lights, an IR transceiver for AC unit control, and a dedicated AC timer manager. A dual-redundancy communication model ensures device controllability even when the primary MQTT broker is unreachable, seamlessly falling back to Firebase. The project is built and flashed with PlatformIO and exposes the device on the local network via mDNS at `smarthome.local`.
 
 ---
 
-## ✨ Key Features
+##  Key Features
 
 - **Dual-Protocol Communication** — Primary control via MQTT (LAN, port 1883); automatic fallback to Firebase RTDB (cloud REST API) when the broker is unavailable.
 - **Matter / CHIP Integration** — Native Matter protocol support, enabling control from Google Home, Apple Home, and Amazon Alexa without a proprietary hub.
@@ -39,7 +39,7 @@
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 
 ```mermaid
 flowchart LR
@@ -70,7 +70,7 @@ flowchart LR
 
 ---
 
-## 🚀 Boot Sequence
+##  Boot Sequence
 
 The firmware performs a strictly ordered initialisation sequence to ensure each subsystem's dependencies are satisfied before it starts:
 
@@ -90,7 +90,7 @@ The firmware performs a strictly ordered initialisation sequence to ensure each 
 
 ---
 
-## 📡 MQTT Topics
+##  MQTT Topics
 
 All topics are rooted at `smarthome/esp32_smart_home_1/`.
 
@@ -114,7 +114,7 @@ All topics are rooted at `smarthome/esp32_smart_home_1/`.
 
 ---
 
-## 🔥 Firebase RTDB Structure
+##  Firebase RTDB Structure
 
 ```
 Firebase RTDB Root
@@ -153,7 +153,7 @@ Firebase RTDB Root
 
 ---
 
-## ⚙️ Supported Commands
+##  Supported Commands
 
 Commands are dispatched via `command_dispatcher` regardless of whether they arrive from MQTT or Firebase.
 
@@ -173,7 +173,7 @@ Commands are dispatched via `command_dispatcher` regardless of whether they arri
 
 ---
 
-## 🔌 GPIO Pinout
+##  GPIO Pinout
 
 | GPIO | Function | Direction | Notes |
 |---|---|---|---|
@@ -191,7 +191,7 @@ Commands are dispatched via `command_dispatcher` regardless of whether they arri
 
 ---
 
-## 🧩 Matter Integration
+##  Matter Integration
 
 ### Overview
 
@@ -254,7 +254,7 @@ When compiled without the `esp-matter` component (e.g., for CI or testing), a st
 
 ---
 
-## 💾 NVS Persistence
+##  NVS Persistence
 
 All persistent state is stored in the **`pins_state`** NVS namespace.
 
@@ -272,7 +272,7 @@ All persistent state is stored in the **`pins_state`** NVS namespace.
 
 ---
 
-## 🔧 Configuration
+##  Configuration
 
 Before building, you must create the following credential/configuration header files. **These files are excluded from version control** (listed in `.gitignore`).
 
@@ -335,7 +335,7 @@ Before building, you must create the following credential/configuration header f
 
 ---
 
-## 🛠️ Build & Flash
+##  Build & Flash
 
 ### Prerequisites
 
@@ -394,7 +394,7 @@ monitor_speed = 115200
 
 ---
 
-## 📝 Notes
+##  Notes
 
 - **DHT22 sensor** (GPIO 4) is currently commented out in the codebase. To re-enable temperature/humidity readings, uncomment the relevant code in `device_config.h` and the sensor task.
 - **Matter commissioning** requires the device to be on the same Wi-Fi network as the commissioner app (Google Home, etc.) during initial setup. The QR code and 11-digit manual pairing code are written to Firebase RTDB at `devices/esp32_smart_home_1/matter_payload/` for retrieval by the Flutter companion app.
