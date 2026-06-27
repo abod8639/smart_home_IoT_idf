@@ -11,7 +11,10 @@
 extern EventGroupHandle_t g_wifi_event_group;
 
 /** Set when the station has a valid IP address. Cleared on disconnect. */
-#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_CONNECTED_BIT  BIT0
+
+/** Set once esp_matter::start() has fully completed and the stack is ready. */
+#define MATTER_READY_BIT    BIT1
 
 /**
  * @brief Initialize the WiFi station and start connecting.
