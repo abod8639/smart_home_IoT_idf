@@ -41,7 +41,8 @@ void test_state_builder_create_full(void) {
     cJSON *root = state_builder_create_full();
     TEST_ASSERT_NOT_NULL(root);
     
-    // Assert root-level parameters
+    // Assert root-level parameters (Note: temperature and humidity are disabled)
+    /*
     cJSON *temp = cJSON_GetObjectItem(root, "temperature");
     TEST_ASSERT_NOT_NULL(temp);
     TEST_ASSERT_EQUAL_FLOAT(26.5f, temp->valuedouble);
@@ -49,6 +50,7 @@ void test_state_builder_create_full(void) {
     cJSON *hum = cJSON_GetObjectItem(root, "humidity");
     TEST_ASSERT_NOT_NULL(hum);
     TEST_ASSERT_EQUAL_FLOAT(60.2f, hum->valuedouble);
+    */
     
     cJSON *tgt = cJSON_GetObjectItem(root, "target_temperature");
     TEST_ASSERT_NOT_NULL(tgt);
@@ -124,9 +126,11 @@ void test_state_builder_create_json_string(void) {
     cJSON *parsed = cJSON_Parse(json_str);
     TEST_ASSERT_NOT_NULL(parsed);
     
+    /*
     cJSON *temp = cJSON_GetObjectItem(parsed, "temperature");
     TEST_ASSERT_NOT_NULL(temp);
     TEST_ASSERT_EQUAL_FLOAT(21.0f, temp->valuedouble);
+    */
     
     cJSON *heap = cJSON_GetObjectItem(parsed, "heap_free");
     TEST_ASSERT_NOT_NULL(heap);
