@@ -33,34 +33,27 @@ static const char *TAG = "MAIN_APP";
 //     // Wait for WiFi before sending any data
 //     xEventGroupWaitBits(g_wifi_event_group, WIFI_CONNECTED_BIT,
 //                         pdFALSE, pdTRUE, portMAX_DELAY);
-
 //     // Subscribe to task watchdog
 //     esp_task_wdt_add(NULL);
-
 //     float last_sync_temp = -100.0f;
 //     float last_sync_hum = -100.0f;
 //     TickType_t last_sync_time = 0;
-
 //     while (true) {
 //         // Feed the watchdog
 //         esp_task_wdt_reset();
-
 //         float temp = 0.0f, hum = 0.0f;
 //         esp_err_t err = dht_sensor_read(&temp, &hum);
-
 //         if (err == ESP_OK) {
 //             ESP_LOGI(TAG, "\033[1;36m[DHT22]\033[0m Climate readout ➔ "
 //                           "Temp: \033[1;36m%.1f°C\033[0m | Hum:
 //                           \033[1;35m%.1f%%\033[0m",
 //                      temp, hum);
-
 //             // Broadcast sensor data via MQTT
 //             char buf[96];
 //             snprintf(buf, sizeof(buf),
 //                      "{\"event\":\"sensor_data\",\"temperature\":%.1f,\"humidity\":%.1f}",
 //                      temp, hum);
 //             mqtt_manager_publish_sensor(buf);
-
 //             // Sync full device state to Firebase conditionally to save quota
 //             TickType_t now = xTaskGetTickCount();
 //             bool time_passed = (now - last_sync_time) >
@@ -68,14 +61,12 @@ static const char *TAG = "MAIN_APP";
 //             last_sync_temp > 0.5f) || (last_sync_temp - temp > 0.5f); bool
 //             hum_changed = (hum - last_sync_hum > 2.0f) || (last_sync_hum -
 //             hum > 2.0f);
-
 //             if (time_passed || temp_changed || hum_changed) {
 //                 firebase_update_full_state();
 //                 last_sync_temp = temp;
 //                 last_sync_hum = hum;
 //                 last_sync_time = now;
 //             }
-
 //         } else if (err == ESP_ERR_INVALID_CRC) {
 //             ESP_LOGW(TAG, "\033[1;33m[DHT22]\033[0m Checksum error — retrying
 //             next cycle");
@@ -83,11 +74,9 @@ static const char *TAG = "MAIN_APP";
 //             ESP_LOGW(TAG, "\033[1;33m[DHT22]\033[0m Read timeout — sensor may
 //             not be connected");
 //         }
-
 //         vTaskDelay(pdMS_TO_TICKS(10000)); // 10 s between reads
 //     }
 // }
-
 // ---------------------------------------------------------------------------
 // app_main — linear init, then hands off to tasks
 // ---------------------------------------------------------------------------
