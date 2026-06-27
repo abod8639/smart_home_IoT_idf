@@ -1,4 +1,4 @@
-#  ESP32 Smart Home IoT Firmware
+# ESP32 Smart Home IoT Firmware
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/abod8639/smart_home_IoT_idf/ci.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/abod8639/smart_home_IoT_idf/actions)
 [![Codecov](https://img.shields.io/codecov/c/github/abod8639/smart_home_IoT_idf?style=for-the-badge&logo=codecov)](https://codecov.io/gh/abod8639/smart_home_IoT_idf)
@@ -14,46 +14,52 @@
 
 ---
 
-##  Overview
+## Overview
 
 **ESP32 Smart Home IoT Firmware** is a production-grade, multi-protocol smart home controller built for the ESP32 microcontroller. It bridges local LAN control via **MQTT**, cloud synchronization via **Firebase Realtime Database**, and native smart home ecosystem integration via the **Matter/CHIP** protocol — all running concurrently on FreeRTOS. The firmware controls an array of hardware peripherals including GPIO relay switches, PWM-driven lamps and RGB lights, an IR transceiver for AC unit control, and a dedicated AC timer manager. A dual-redundancy communication model ensures device controllability even when the primary MQTT broker is unreachable, seamlessly falling back to Firebase. The project is built and flashed with PlatformIO and exposes the device on the local network via mDNS at `smarthome.local`.
 
 ---
 
-##  Key Features
+## Key Features
 
 - **Dual-Protocol Communication** — Primary control via MQTT (LAN, port 1883); automatic fallback to Firebase RTDB (cloud REST API) when the broker is unavailable.
 - **Matter / CHIP Integration** — Native Matter protocol support, enabling control from Google Home, Apple Home, and Amazon Alexa without a proprietary hub.
-- **Persistent Matter Endpoints** — Up to 8 Matter endpoints stored in NVS flash; endpoints are reloaded before `esp_matter::start()` so the Commissioner always sees the full device list after a reboot.
-- **GPIO Relay Control** — 4 independent relay channels (GPIO 2, 18, 19, 21) for switching mains-powered appliances.
-- **PWM Dimmer & RGB Control** — LEDC peripheral drives a dimmable lamp (GPIO 22) and a full-colour RGB LED strip (GPIO 23/25/26), with 0–255 resolution.
-- **IR Transceiver (RMT)** — Send and learn IR signals via GPIO 33 (TX) and GPIO 32 (RX), targeting AC units and other IR-controlled appliances.
+- **Persistent Matter Endpoints** — Up to 14 Matter endpoints stored in NVS flash; endpoints are reloaded before `esp_matter::start()` so the Commissioner always sees the full device list after a reboot.
+- **GPIO Relay Control** — 12 independent relay channels (GPIO 2, 18, 19, 21, 5, 12, 13, 14, 15, 16, 17, 27) for switching appliances.
+- **PWM Dimmer & RGB Control** — LEDC peripheral drives a dimmable lamp (GPIO 22), a full-colour RGB LED strip (GPIO 23/25/26), and other PWM-capable channels (GPIO 5, 12, 13, 14, 15, 16, 17, 27), with 0–255 resolution.
+- **Captive Portal Wi-Fi Provisioning** — Starts a local Access Point (`SmartHome-Setup`) when no Wi-Fi credentials are found in NVS, or when the BOOT button (GPIO 0) is held for 3 seconds, allowing configuration via a responsive web interface.
+- **IR Transceiver (RMT)** — Send and learn IR signals via GPIO 33 (TX) and GPIO 32 (RX) using hardware-accelerated RMT, supporting NEC, Samsung, and Sony protocols.
 - **AC Smart Timer** — Dedicated timer manager for scheduled AC on/off with target-temperature awareness.
-- **Over-the-Air (OTA) Updates** — Secure HTTPS-only OTA firmware updates triggered via MQTT command.
+- **Over-the-Air (OTA) Updates** — Secure HTTPS-only OTA firmware updates with trusted URL validation.
 - **NVS State Persistence** — Relay states, target temperature, Wi-Fi credentials, and Matter device configurations are persisted to NVS across reboots.
-- **SNTP Time Synchronisation** — Automatic UTC clock sync on boot for accurate timestamped events and scheduling.
-- **mDNS Discovery** — Device is discoverable on the local network at `smarthome.local` without knowing the IP address.
+- **SNTP Time Synchronisation** — Automatic UTC clock sync on boot via lwIP native SNTP for accurate timestamped events and scheduling.
+- **mDNS Discovery** — Device is discoverable on the local network at `smarthome.local` using the `espressif__mdns` component.
 - **Task Watchdog** — 30-second hardware watchdog prevents firmware lockups; triggers a panic and reboot on timeout.
-- **Command Dispatcher** — Clean, extensible command routing layer decouples protocol-specific transports (MQTT / Firebase) from hardware actions.
+- **Command Dispatcher** — Clean, extensible command routing layer with component mocks and unit tests, decoupling protocol-specific transports from hardware actions.
 - **Flutter App Integration** — Designed to pair with a companion Flutter mobile app that reads/writes MQTT topics and Firebase paths.
 
 ---
 
-##  Architecture
+## Architecture
 
 ```mermaid
 flowchart LR
         FA[Flutter App]
-        Voice[Smart Home Speakers\nGoogle / Apple / Alexa]
+        Voice[
+        Smart Home 
+        Google 
+        Apple
+        Alexa
+        ]
 
-        MQ[MQTT Broker\nLocal LAN]
-        FB[(Firebase RTDB\nCloud Database)]
+        MQ[MQTT Broker Local LAN]
+        FB[(Firebase RTDB Cloud Database)]
 
         ESP[ESP32 Smart Firmware]
 
-        Relays[🎛️ 4x Relays\nAppliances]
-        Lights[💡 Lights\nPWM & RGB]
-        AC[❄️ AC Controller\nIR & Timer]
+        Relays[12x Relays Appliances]
+        Lights[Lights PWM & RGB]
+        AC[AC Controller IR & Timer]
 
     %% Connections
     FA <-->|MQTT pub/sub| MQ
@@ -70,37 +76,37 @@ flowchart LR
 
 ---
 
-##  Boot Sequence
+## Boot Sequence
 
 The firmware performs a strictly ordered initialisation sequence to ensure each subsystem's dependencies are satisfied before it starts:
 
 1. **Task Watchdog** — Registered with a 30-second timeout. Any task that blocks longer than 30 s triggers a panic and system reboot.
 2. **NVS Storage** — `nvs_flash_init()` is called first; this is the backing store for Wi-Fi credentials, relay states, target temperature, and all Matter endpoint data.
-3. **GPIO Relay Init** — All four relay GPIOs are configured as outputs and restored to their last known state from NVS.
-4. **PWM (LEDC) Init** — LEDC peripheral is configured for the PWM lamp and RGB channels.
-5. **IR Manager Init** — RMT peripheral is initialised for IR TX (GPIO 33) and IR RX (GPIO 32).
+3. **GPIO Relay Init** — All 12 relay GPIOs are configured as outputs and restored to their last known state from NVS.
+4. **PWM (LEDC) Init** — LEDC peripheral is configured for the PWM lamp, RGB, and extra PWM channels.
+5. **IR Manager Init** — RMT peripheral is initialised for IR TX (GPIO 33) and IR RX (GPIO 32) protocol decoding.
 6. **AC Timer Manager Init** — AC countdown timer task is started and linked to the IR manager.
-7. **Button Manager Init** — Physical button(s) configured for manual override and reset.
-8. **WiFi Manager Init** — Connects to the configured AP using credentials from NVS (or `wifi_credentials.h`). Sets `WIFI_CONNECTED_BIT` in the global event group on success.
+7. **Button Manager Init** — Physical BOOT button (GPIO 0) is configured to trigger Captive Portal setup mode on a 3-second long press.
+8. **WiFi Manager Init** — Checks NVS for saved Wi-Fi credentials. If found, connects immediately (sets `WIFI_CONNECTED_BIT` on success). If no credentials exist, automatically starts the Captive Portal AP (`SmartHome-Setup`) for provisioning.
 9. **MQTT Manager Init** — Connects to the broker defined in `mqtt_credentials.h`. Subscribes to the command topic immediately after connection.
 10. **Matter Manager Init** — Loads saved endpoints from NVS → registers all endpoints with the Matter stack → calls `esp_matter::start()` → sets `MATTER_READY_BIT` (BIT1) in `g_wifi_event_group` after a 500 ms stabilisation delay.
-11. **Firebase Manager Init** — Spawns `firebase_poll_task` (priority 5, stack 8192 bytes). The task blocks until both `WIFI_CONNECTED_BIT` **and** `MATTER_READY_BIT` are set (up to 30 s timeout) before reading the Matter QR payload from Firebase.
+11. **Firebase Manager Init** — Spawns `firebase_poll_task` (priority 5, stack 8192 bytes) with thread-safe HTTP request mutex protection. The task blocks until both `WIFI_CONNECTED_BIT` **and** `MATTER_READY_BIT` are set (up to 30 s timeout) before reading the Matter QR payload from Firebase.
 12. **mDNS Manager Init** — Registers the device as `smarthome.local` on the local network.
-13. **SNTP Manager Init** — Starts NTP synchronisation to get the current UTC time.
+13. **SNTP Manager Init** — Starts native lwIP NTP synchronisation to get the current UTC time.
 
 ---
 
-##  MQTT Topics
+## MQTT Topics
 
 All topics are rooted at `smarthome/esp32_smart_home_1/`.
 
 | Topic | Direction | QoS | Retained | Description |
 |---|---|---|---|---|
 | `smarthome/esp32_smart_home_1/cmd` | **Subscribe** | 0 | No | Inbound control commands (JSON payload) |
-| `smarthome/esp32_smart_home_1/state` | **Publish** | 1 | ✅ Yes | Full device state snapshot (published on request or state change) |
+| `smarthome/esp32_smart_home_1/state` | **Publish** | 1 | Yes | Full device state snapshot (published on request or state change) |
 | `smarthome/esp32_smart_home_1/event` | **Publish** | 1 | No | Delta events — individual pin or sensor changes |
 | `smarthome/esp32_smart_home_1/sensor` | **Publish** | 1 | No | Sensor readings (temperature, humidity when DHT22 enabled) |
-| `smarthome/esp32_smart_home_1/status` | **Publish (LWT)** | 1 | ✅ Yes | `"online"` on connect, `"offline"` as Last Will & Testament |
+| `smarthome/esp32_smart_home_1/status` | **Publish (LWT)** | 1 | Yes | `"online"` on connect, `"offline"` as Last Will & Testament |
 
 ### Example Command Payload
 
@@ -114,53 +120,65 @@ All topics are rooted at `smarthome/esp32_smart_home_1/`.
 
 ---
 
-##  Firebase RTDB Structure
+## Firebase RTDB Structure
 
 ```
 Firebase RTDB Root
 └── devices/
-│   └── esp32_smart_home_1/
-│       ├── status                    "online" | "offline"
-│       ├── commands/                 ← Flutter app writes; ESP32 polls every 3 s
-│       │   ├── action                e.g. "set_relay"
-│       │   ├── pin                   target GPIO pin
-│       │   └── value                 command payload value
-│       ├── pins/
-│       │   ├── relay_1               0 | 1  (GPIO 2)
-│       │   ├── relay_2               0 | 1  (GPIO 18)
-│       │   ├── relay_3               0 | 1  (GPIO 19 / AC)
-│       │   ├── relay_4               0 | 1  (GPIO 21)
-│       │   ├── pwm_lamp              0–255  (GPIO 22)
-│       │   ├── pwm_rgb_r             0–255  (GPIO 23)
-│       │   ├── pwm_rgb_g             0–255  (GPIO 25)
-│       │   └── pwm_rgb_b             0–255  (GPIO 26)
-│       ├── target_temperature        int (16–30 °C)
-│       ├── ac_timer_remaining        int (seconds remaining)
-│       ├── ir_signal/
-│       │   ├── protocol              e.g. "NEC", "SAMSUNG"
-│       │   ├── last_value            hex string
-│       │   └── timestamp             Unix epoch (ms)
-│       └── matter_payload/
-│           ├── qr_code               Matter QR payload string
-│           └── manual_code           11-digit manual pairing code
-└── app_data/
-    ├── rooms/                        Room definitions from Flutter app
-    ├── devices/                      Virtual device registry
-    └── ir_codes/                     Learned/stored IR code library
+    └── esp32_smart_home_1/
+        ├── status                    "online" | "offline"
+        ├── commands/                 ← Flutter app writes; ESP32 polls every 3 s
+        │   ├── action                e.g. "set_relay"
+        │   ├── pin                   target GPIO pin
+        │   └── value                 command payload value
+        ├── pins/
+        │   ├── relay_1               0 | 1  (GPIO 2)
+        │   ├── relay_2               0 | 1  (GPIO 18)
+        │   ├── relay_3               0 | 1  (GPIO 19 / AC)
+        │   ├── relay_4               0 | 1  (GPIO 21)
+        │   ├── relay_5               0 | 1  (GPIO 5)
+        │   ├── relay_6               0 | 1  (GPIO 12)
+        │   ├── relay_7               0 | 1  (GPIO 13)
+        │   ├── relay_8               0 | 1  (GPIO 14)
+        │   ├── relay_9               0 | 1  (GPIO 15)
+        │   ├── relay_10              0 | 1  (GPIO 16)
+        │   ├── relay_11              0 | 1  (GPIO 17)
+        │   ├── relay_12              0 | 1  (GPIO 27)
+        │   ├── pwm_lamp              0–255  (GPIO 22)
+        │   ├── pwm_rgb_r             0–255  (GPIO 23)
+        │   ├── pwm_rgb_g             0–255  (GPIO 25)
+        │   ├── pwm_rgb_b             0–255  (GPIO 26)
+        │   ├── pwm_5                 0–255  (GPIO 5)
+        │   ├── pwm_6                 0–255  (GPIO 12)
+        │   ├── pwm_7                 0–255  (GPIO 13)
+        │   ├── pwm_8                 0–255  (GPIO 14)
+        │   ├── pwm_9                 0–255  (GPIO 15)
+        │   ├── pwm_10                0–255  (GPIO 16)
+        │   ├── pwm_11                0–255  (GPIO 17)
+        │   └── pwm_12                0–255  (GPIO 27)
+        ├── target_temperature        int (16–30 °C)
+        ├── ac_timer_remaining        int (seconds remaining)
+        ├── ir_signal/
+        │   ├── protocol              e.g. "NEC", "SAMSUNG", "SONY"
+        │   ├── last_value            hex string
+        │   └── timestamp             Unix epoch (ms)
+        └── matter_payload/
+            ├── qr_code               Matter QR payload string
+            └── manual_code           11-digit manual pairing code
 ```
 
-> **Polling interval:** `firebase_poll_task` reads the `commands/` node every **3 seconds** and dispatches received actions through the same `command_dispatcher` as MQTT commands, ensuring consistent behaviour across both transports.
+> **Polling interval:** `firebase_poll_task` reads the `commands/` node every **3 seconds** (using conditional syncing to minimize API quota) and dispatches received actions through the same `command_dispatcher` as MQTT commands.
 
 ---
 
-##  Supported Commands
+## Supported Commands
 
 Commands are dispatched via `command_dispatcher` regardless of whether they arrive from MQTT or Firebase.
 
 | `action` | Required Parameters | Optional Parameters | Description |
 |---|---|---|---|
-| `set_relay` | `pin` (2/18/19/21), `value` (0 or 1) | — | Toggle a relay on or off |
-| `set_pwm` | `pin` (22/23/25/26), `value` (0–255) | — | Set PWM duty cycle (brightness) |
+| `set_relay` | `pin` (2/18/19/21/5/12/13/14/15/16/17/27), `value` (0 or 1) | — | Toggle a relay on or off |
+| `set_pwm` | `pin` (22/23/25/26/5/12/13/14/15/16/17/27), `value` (0–255) | — | Set PWM duty cycle (brightness) |
 | `control_ac` | `isOn` (bool), `target_temp` (16–30) | — | Send AC power / temperature IR command |
 | `set_ac_timer` | `seconds` (int), `ir_code` (string) | — | Schedule AC off after N seconds |
 | `ir_send` / `send_ir` | `protocol`, `value`, `bits` | `freq` (kHz, default 38) | Transmit a raw IR code |
@@ -169,29 +187,37 @@ Commands are dispatched via `command_dispatcher` regardless of whether they arri
 | `add_device` | `type` (Matter device type), `pin` | — | Dynamically provision a new Matter endpoint and persist to NVS |
 | `get_state` | — | — | Force publish of full device state to `state` topic / Firebase |
 
-> **Security note:** `ota_start` enforces HTTPS. HTTP URLs are rejected to prevent MITM firmware injection.
+> **Security note:** `ota_start` enforces HTTPS and validates the URL against optional trusted prefixes to prevent unauthorized firmware injection.
 
 ---
 
-##  GPIO Pinout
+## GPIO Pinout
 
 | GPIO | Function | Direction | Notes |
 |---|---|---|---|
-| **2** | Relay 1 | Output | Matter Endpoint 1 |
+| **2** | Relay 1 | Output | Matter Endpoint 1 (Onboard LED Indicator during setup) |
 | **18** | Relay 2 | Output | Matter Endpoint 2 |
 | **19** | Relay 3 — AC Unit | Output | Matter Endpoint 3 |
 | **21** | Relay 4 | Output | Matter Endpoint 4 |
+| **5** | Relay 5 / PWM 5 | Output | Matter Endpoint 7 |
+| **12** | Relay 6 / PWM 6 | Output | Matter Endpoint 8 |
+| **13** | Relay 7 / PWM 7 | Output | Matter Endpoint 9 |
+| **14** | Relay 8 / PWM 8 | Output | Matter Endpoint 10 |
+| **15** | Relay 9 / PWM 9 | Output | Matter Endpoint 11 |
+| **16** | Relay 10 / PWM 10 | Output | Matter Endpoint 12 |
+| **17** | Relay 11 / PWM 11 | Output | Matter Endpoint 13 |
+| **27** | Relay 12 / PWM 12 | Output | Matter Endpoint 14 |
 | **22** | PWM Lamp (LEDC) | Output | Matter Endpoint 5, 0–255 duty |
 | **23** | PWM RGB — Red | Output | Matter Endpoint 6 |
 | **25** | PWM RGB — Green | Output | Matter Endpoint 6 |
 | **26** | PWM RGB — Blue | Output | Matter Endpoint 6 |
-| **33** | IR Transmitter (RMT TX) | Output | NEC, Samsung, etc. |
+| **33** | IR Transmitter (RMT TX) | Output | NEC, Samsung, Sony, etc. |
 | **32** | IR Receiver (RMT RX) | Input | IR learning mode |
 | **4** | DHT22 Temperature/Humidity | Input | ⚠️ Currently disabled (commented out) |
 
 ---
 
-##  Matter Integration
+## Matter Integration
 
 ### Overview
 
@@ -218,7 +244,7 @@ Matter endpoints are persisted to NVS under the `pins_state` namespace using the
 
 | NVS Key | Type | Content |
 |---|---|---|
-| `mt_cnt` | `uint8_t` | Number of saved Matter endpoints (max 8) |
+| `mt_cnt` | `uint8_t` | Number of saved Matter endpoints (max 14) |
 | `mt0_t` | `uint8_t` | Endpoint 0 — device type |
 | `mt0_p` | `uint8_t` | Endpoint 0 — GPIO pin |
 | `mt{n}_t` | `uint8_t` | Endpoint N — device type |
@@ -247,6 +273,14 @@ Matter Manager init order:
 | 4 | GPIO 21 | On/Off Switch (Relay 4) |
 | 5 | GPIO 22 | Dimmable Light (PWM Lamp) |
 | 6 | GPIO 23/25/26 | Color Light (RGB) |
+| 7 | GPIO 5 | On/Off Light / Dimmable Light (Relay 5 / PWM 5) |
+| 8 | GPIO 12 | On/Off Light / Dimmable Light (Relay 6 / PWM 6) |
+| 9 | GPIO 13 | On/Off Light / Dimmable Light (Relay 7 / PWM 7) |
+| 10 | GPIO 14 | On/Off Light / Dimmable Light (Relay 8 / PWM 8) |
+| 11 | GPIO 15 | On/Off Light / Dimmable Light (Relay 9 / PWM 9) |
+| 12 | GPIO 16 | On/Off Light / Dimmable Light (Relay 10 / PWM 10) |
+| 13 | GPIO 17 | On/Off Light / Dimmable Light (Relay 11 / PWM 11) |
+| 14 | GPIO 27 | On/Off Light / Dimmable Light (Relay 12 / PWM 12) |
 
 ### Stub Mode
 
@@ -254,13 +288,13 @@ When compiled without the `esp-matter` component (e.g., for CI or testing), a st
 
 ---
 
-##  NVS Persistence
+## NVS Persistence
 
 All persistent state is stored in the **`pins_state`** NVS namespace.
 
 | NVS Key | Type | Description |
 |---|---|---|
-| `p{pin}` | `uint8_t` | Relay state for GPIO `{pin}` (e.g., `p2`, `p18`, `p19`, `p21`) |
+| `p{pin}` | `uint8_t` | Relay state for GPIO `{pin}` (e.g., `p2`, `p18`, `p19`, `p21`, `p5`, `p12`, `p13`, `p14`, `p15`, `p16`, `p17`, `p27`) |
 | `target_temp` | `int32_t` | Last set AC target temperature (°C) |
 | `wifi_ssid` | `string` | Wi-Fi network SSID |
 | `wifi_pass` | `string` | Wi-Fi network password |
@@ -272,7 +306,7 @@ All persistent state is stored in the **`pins_state`** NVS namespace.
 
 ---
 
-##  Configuration
+## Configuration
 
 Before building, you must create the following credential/configuration header files. **These files are excluded from version control** (listed in `.gitignore`).
 
@@ -320,14 +354,32 @@ Before building, you must create the following credential/configuration header f
 #define FIRMWARE_VERSION    "2.0.0"
 
 // GPIO Pin Definitions
-#define PIN_RELAY_1         2
-#define PIN_RELAY_2         18
-#define PIN_RELAY_3_AC      19
-#define PIN_RELAY_4         21
-#define PIN_PWM_LAMP        22
-#define PIN_RGB_RED         23
-#define PIN_RGB_GREEN       25
-#define PIN_RGB_BLUE        26
+#define RELAY_1_PIN   2
+#define RELAY_2_PIN  18
+#define RELAY_3_PIN  19
+#define RELAY_4_PIN  21
+#define RELAY_5_PIN   5
+#define RELAY_6_PIN  12
+#define RELAY_7_PIN  13
+#define RELAY_8_PIN  14
+#define RELAY_9_PIN  15
+#define RELAY_10_PIN 16
+#define RELAY_11_PIN 17
+#define RELAY_12_PIN 27
+
+#define PWM_LAMP_PIN   22
+#define PWM_RGB_R_PIN  23
+#define PWM_RGB_G_PIN  25
+#define PWM_RGB_B_PIN  26
+#define PWM_5_PIN      5
+#define PWM_6_PIN     12
+#define PWM_7_PIN     13
+#define PWM_8_PIN     14
+#define PWM_9_PIN     15
+#define PWM_10_PIN    16
+#define PWM_11_PIN    17
+#define PWM_12_PIN    27
+
 #define PIN_IR_TX           33
 #define PIN_IR_RX           32
 // #define PIN_DHT22        4   // Disabled — uncomment to enable
@@ -335,7 +387,7 @@ Before building, you must create the following credential/configuration header f
 
 ---
 
-##  Build & Flash
+## Build & Flash
 
 ### Prerequisites
 
@@ -394,9 +446,10 @@ monitor_speed = 115200
 
 ---
 
-##  Notes
+## Notes
 
-- **DHT22 sensor** (GPIO 4) is currently commented out in the codebase. To re-enable temperature/humidity readings, uncomment the relevant code in `device_config.h` and the sensor task.
+- **DHT22 sensor** (GPIO 4) timing is stabilized with critical sections/spinlocks, but currently commented out in the codebase. To re-enable temperature/humidity readings, uncomment the relevant code in `device_config.h` and the sensor task.
+- **Wi-Fi Provisioning Captive Portal** starts automatically when no credentials are saved in NVS, or when the BOOT button is held for 3 seconds. It launches a local AP (`SmartHome-Setup`) with a configuration page.
 - **Matter commissioning** requires the device to be on the same Wi-Fi network as the commissioner app (Google Home, etc.) during initial setup. The QR code and 11-digit manual pairing code are written to Firebase RTDB at `devices/esp32_smart_home_1/matter_payload/` for retrieval by the Flutter companion app.
 - **Factory reset** can be performed by erasing NVS flash with `pio run --target erase`, which clears all saved credentials, relay states, and Matter endpoint bindings.
 - The **Task Watchdog** (30 s) is intentional and should not be disabled in production. Ensure that all FreeRTOS tasks call `esp_task_wdt_reset()` (or yield) within the watchdog window.
