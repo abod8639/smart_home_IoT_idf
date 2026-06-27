@@ -7,7 +7,7 @@
 #include "mqtt_manager.h"
 #include "ac_timer_manager.h"
 #include "wifi_manager.h"
-#include "dht_sensor.h"
+// #include "dht_sensor.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include <string.h>
@@ -127,13 +127,13 @@ int wifi_manager_get_rssi(void) {
 }
 
 // DHT Sensor Mocks
-float dht_sensor_get_temperature(void) {
-    return mock_status.dht.temperature_return_val;
-}
+// float dht_sensor_get_temperature(void) {
+//     return mock_status.dht.temperature_return_val;
+// }
 
-float dht_sensor_get_humidity(void) {
-    return mock_status.dht.humidity_return_val;
-}
+// float dht_sensor_get_humidity(void) {
+//     return mock_status.dht.humidity_return_val;
+// }
 
 // ESP System Mocks
 uint32_t esp_get_free_heap_size(void) {
